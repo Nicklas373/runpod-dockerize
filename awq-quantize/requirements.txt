@@ -1,0 +1,2 @@
+mistral-common
+transformers==5.0.0rc0

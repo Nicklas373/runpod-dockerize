@@ -2,21 +2,24 @@
 # Reference: https://github.com/xhedit/quantkit/
 
 import argparse
-from pathlib import Path
-from io import BytesIO
-import requests
-
 from datasets import load_dataset, Dataset
 from huggingface_hub import snapshot_download
-from transformers import AutoModelForCausalLM, AutoModelForImageTextToText, AutoTokenizer, AutoProcessor
-from PIL import Image
-
+from io import BytesIO
 from llmcompressor import oneshot
 from llmcompressor.modifiers.awq import AWQModifier
-from llmcompressor.modifiers.smoothquant import SmoothQuantModifier
+from pathlib import Path
+from PIL import Image
+import requests
+from transformers import (
+    AutoModelForCausalLM,
+    AutoModelForImageTextToText,
+    AutoTokenizer,
+    AutoProcessor,
+    Mistral3ForConditionalGeneration
+)
 
 # --------------------------------------------------
-# Multimodal Model Detection
+# Multimodal Model Variables & Functions
 # --------------------------------------------------
 def is_multimodal_model(model_id: str) -> bool:
     keywords = ["apriel", "qwen3-vl"] # Add more keywords as needed
@@ -36,6 +39,13 @@ def load_image(image):
             return Image.open(BytesIO(requests.get(image).content)).convert("RGB")
         return Image.open(image).convert("RGB")
     raise ValueError("Unsupported image format")
+
+# --------------------------------------------------
+# Mistral Model Variables & Functions
+# --------------------------------------------------
+def is_mistral_model(model_id: str) -> bool:
+    keywords = ["mistral", "ministral","ministral3"] # Add more keywords as needed
+    return any(k in model_id.lower() for k in keywords)
 
 # --------------------------------------------------
 # 1. Download & Prepare Model Directory
@@ -84,8 +94,11 @@ def run_awq_quantization(
     # Step 1: Download/Verify local model
     model_path = get_model_path(branch, False, hf_cache, model_id)
     is_mm_model = is_multimodal_model(model_id)
+    is_mt_model = is_mistral_model(model_id)
 
+    # Debug info
     print(f"Multimodal model detected: {is_mm_model}")
+    print(f"Mistral model detected: {is_mt_model}")
 
     # Step 2: Manually load the model with the trust flag
     print(f"Loading model from {model_path}...")
@@ -93,8 +106,18 @@ def run_awq_quantization(
         model = AutoModelForImageTextToText.from_pretrained(
             model_path,
             trust_remote_code=trust_remote_code,
-            device_map="auto",
             dtype="auto",
+            device_map="auto"
+        )
+        processor = AutoProcessor.from_pretrained(
+            model_path,
+            trust_remote_code=trust_remote_code,
+        )
+    elif is_mt_model:
+        model = Mistral3ForConditionalGeneration.from_pretrained(
+            model_path,
+            dtype="auto",
+            device_map="auto"
         )
         processor = AutoProcessor.from_pretrained(
             model_path,
@@ -184,105 +207,61 @@ def run_awq_quantization(
             "re:.*post_attention_layernorm$",
             "re:.*lm_head",
         )
-    if is_mm_model:
+    
+    if is_mm_model or is_mt_model:
         ignore_modules += (
             "re:.*vision_tower.*",
             "re:.*vision_encoder.*",
             "re:.*multi_modal_projector.*",
             "re:model[.]visual.*",
         )
-    if is_mm_model == False:
-        recipe = [
-            SmoothQuantModifier(smoothing_strength=0.8),
-            AWQModifier(
-                targets=["Linear"],
-                ignore=ignore_modules,
-                config_groups={
-                    "channel_sensitive": {
-                        "targets": [
-                            're:.*q_proj$',
-                            're:.*k_proj$',
-                            're:.*v_proj$',
-                            're:.*gate_proj$',
-                            're:.*up_proj$'
-                        ],
-                        "weights": {
-                            "num_bits": 4,
-                            "type": "int",
-                            "symmetric": True,
-                            "strategy": "channel",
-                            "observer": "minmax",
-                            "dynamic": False,
-                        },
+
+    recipe = [
+        AWQModifier(
+            targets=["Linear"],
+            ignore=ignore_modules,
+            config_groups={
+                "channel_sensitive": {
+                    "targets": [
+                        're:.*q_proj$',
+                        're:.*k_proj$',
+                        're:.*v_proj$',
+                        're:.*o_proj$', # For Mistral models only 
+                        're:.*gate_proj$',
+                        're:.*up_proj$'
+                    ],
+                    "weights": {
+                        "num_bits": 4,
+                        "type": "int",
+                        "symmetric": True,
+                        "strategy": "channel",
+                        "observer": "minmax",
+                        "dynamic": False,
                     },
-                    "group_0": {
-                        "targets": ["re:.*down_proj$"],
-                        "weights": {
-                            "num_bits": 4,
-                            "type": "int",
-                            "symmetric": True,
-                            "strategy": "group",
-                            "group_size": 32,
-                            "observer": "mse",
-                            "dynamic": False,
-                        },
-                    }
                 },
-                mappings=[
-                    {
-                        "smooth_layer": r"re:.*up_proj$",
-                        "balance_layers": [r"re:.*down_proj$"],
+                "group_0": {
+                    "targets": ["re:.*down_proj$"],
+                    "weights": {
+                        "num_bits": 4,
+                        "type": "int",
+                        "symmetric": True,
+                        "strategy": "group",
+                        "group_size": 32,
+                        "observer": "mse",
+                        "dynamic": False,
                     },
-                ],
-            )
-        ]
-    elif is_mm_model:
-        recipe = [
-            AWQModifier(
-                targets=["Linear"],
-                ignore=ignore_modules,
-                config_groups={
-                    "channel_sensitive": {
-                        "targets": [
-                            're:.*q_proj$',
-                            're:.*k_proj$',
-                            're:.*v_proj$',
-                            're:.*gate_proj$',
-                            're:.*up_proj$'
-                        ],
-                        "weights": {
-                            "num_bits": 4,
-                            "type": "int",
-                            "symmetric": True,
-                            "strategy": "channel",
-                            "observer": "minmax",
-                            "dynamic": False,
-                        },
-                    },
-                    "group_0": {
-                        "targets": ["re:.*down_proj$"],
-                        "weights": {
-                            "num_bits": 4,
-                            "type": "int",
-                            "symmetric": True,
-                            "strategy": "group",
-                            "group_size": 32,
-                            "observer": "mse",
-                            "dynamic": False,
-                        },
-                    }
+                }
+            },
+            mappings=[
+                {
+                    "smooth_layer": r"re:.*up_proj$",
+                    "balance_layers": [r"re:.*down_proj$"],
                 },
-                mappings=[
-                    {
-                        "smooth_layer": r"re:.*up_proj$",
-                        "balance_layers": [r"re:.*down_proj$"],
-                    },
-                ],
-            )
-        ]
+            ],
+        )
+    ]
 
     # Step 4: Run Oneshot Quantization
-    # llm-compressor handles loading the model from the local_path
     output_dir = f"{model_path.name}-AWQ"
 
     print(f"Starting AWQ quantization. Output: {output_dir}")
