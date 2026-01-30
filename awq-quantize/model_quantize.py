@@ -15,14 +15,20 @@ from transformers import (
     AutoModelForImageTextToText,
     AutoTokenizer,
     AutoProcessor,
-    Mistral3ForConditionalGeneration
 )
 
 # --------------------------------------------------
 # Multimodal Model Variables & Functions
 # --------------------------------------------------
 def is_multimodal_model(model_id: str) -> bool:
-    keywords = ["apriel", "qwen3-vl"] # Add more keywords as needed
+    keywords = [
+        "apriel",
+        "mistral",
+        "ministral",
+        "ministral3",
+        "kimivl",
+        "qwen3-vl"
+    ] # Add more keywords as needed
     return any(k in model_id.lower() for k in keywords)
 
 def detect_image_column(dataset):
@@ -39,13 +45,6 @@ def load_image(image):
             return Image.open(BytesIO(requests.get(image).content)).convert("RGB")
         return Image.open(image).convert("RGB")
     raise ValueError("Unsupported image format")
-
-# --------------------------------------------------
-# Mistral Model Variables & Functions
-# --------------------------------------------------
-def is_mistral_model(model_id: str) -> bool:
-    keywords = ["mistral", "ministral","ministral3"] # Add more keywords as needed
-    return any(k in model_id.lower() for k in keywords)
 
 # --------------------------------------------------
 # 1. Download & Prepare Model Directory
@@ -94,11 +93,8 @@ def run_awq_quantization(
     # Step 1: Download/Verify local model
     model_path = get_model_path(branch, False, hf_cache, model_id)
     is_mm_model = is_multimodal_model(model_id)
-    is_mt_model = is_mistral_model(model_id)
-
     # Debug info
     print(f"Multimodal model detected: {is_mm_model}")
-    print(f"Mistral model detected: {is_mt_model}")
 
     # Step 2: Manually load the model with the trust flag
     print(f"Loading model from {model_path}...")
@@ -106,16 +102,6 @@ def run_awq_quantization(
         model = AutoModelForImageTextToText.from_pretrained(
             model_path,
             trust_remote_code=trust_remote_code,
-            dtype="auto",
-            device_map="auto"
-        )
-        processor = AutoProcessor.from_pretrained(
-            model_path,
-            trust_remote_code=trust_remote_code,
-        )
-    elif is_mt_model:
-        model = Mistral3ForConditionalGeneration.from_pretrained(
-            model_path,
             dtype="auto",
             device_map="auto"
         )
@@ -208,7 +194,7 @@ def run_awq_quantization(
             "re:.*lm_head",
         )
     
-    if is_mm_model or is_mt_model:
+    if is_mm_model:
         ignore_modules += (
             "re:.*vision_tower.*",
             "re:.*vision_encoder.*",
@@ -226,7 +212,7 @@ def run_awq_quantization(
                         're:.*q_proj$',
                         're:.*k_proj$',
                         're:.*v_proj$',
-                        're:.*o_proj$', # For Mistral models only 
+                        're:.*o_proj$',
                         're:.*gate_proj$',
                         're:.*up_proj$'
                     ],
@@ -235,7 +221,7 @@ def run_awq_quantization(
                         "type": "int",
                         "symmetric": True,
                         "strategy": "channel",
-                        "observer": "minmax",
+                        "observer": "mse",
                         "dynamic": False,
                     },
                 },
@@ -252,12 +238,6 @@ def run_awq_quantization(
                     },
                 }
             },
-            mappings=[
-                {
-                    "smooth_layer": r"re:.*up_proj$",
-                    "balance_layers": [r"re:.*down_proj$"],
-                },
-            ],
         )
     ]
 

@@ -58,11 +58,10 @@ print("mamba CUDA OK")
 EOF
 
 # Copy quantization scripts into the container
-COPY model_inspect.py /workspace/
-COPY model_quantize.py /workspace/
+COPY model_consolidated /workspace/
 COPY model_eval.py /workspace/
-COPY model_upload.py /workspace/
-COPY init_mistral.sh /workspace/
+COPY model_quantize.py /workspace/
+COPY requirements.txt /workspace/
 
 # Expose VS Code port
 EXPOSE 8080

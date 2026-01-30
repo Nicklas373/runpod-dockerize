@@ -14,6 +14,7 @@ AWQModifier(
                 're:.*q_proj$',
                 're:.*k_proj$',
                 're:.*v_proj$',
+                're:.*o_proj$',
                 're:.*gate_proj$',
                 're:.*up_proj$'
             ],
@@ -22,7 +23,7 @@ AWQModifier(
                 "type": "int",
                 "symmetric": True,
                 "strategy": "channel",
-                "observer": "minmax",
+                "observer": "mse",
                 "dynamic": False,
             },
         },
@@ -39,12 +40,6 @@ AWQModifier(
             },
         }
     },
-    mappings=[
-        {
-            "smooth_layer": r"re:.*up_proj$",
-            "balance_layers": [r"re:.*down_proj$"],
-        },
-    ],
 )
 ```
 
@@ -106,11 +101,11 @@ python3 model_upload.py --hf_token XXXX --repo_id YOUR_REPO_NAME --local_dir YOU
 - /workspace/model_quantize.py: Python based quantization script
 - /workspace/model_upload.py: Python based upload to HF script
 - /workspace/model_eval.py: Python based evaluate quantized model script
-- /workspace/init-mistral.sh: Bash based to install required library for mistral model
+- /workspace/requirements.txt: Python requirements required library for mistral model
 
 ## Notes for Mistral / Ministral family
 
-- Run script init-mistral.sh before run or proceed with quantization
+- Run install requirements.txt before run or proceed with quantization
 
 ```shell
 pip install -r requirements.txt

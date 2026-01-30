@@ -5,17 +5,18 @@ from transformers import (
     AutoModelForImageTextToText,
     AutoTokenizer,
     AutoProcessor,
-    Mistral3ForConditionalGeneration
 )
 
 # Check if the model is multimodal
 def is_multimodal_model(model_id: str) -> bool:
-    keywords = ["apriel", "qwen3-vl"] # Add more keywords as needed
-    return any(k in model_id.lower() for k in keywords)
-
-# Check if the model is a Mistral model
-def is_mistral_model(model_id: str) -> bool:
-    keywords = ["mistral", "ministral","ministral3"] # Add more keywords as needed
+    keywords = keywords = [
+        "apriel",
+        "mistral",
+        "ministral",
+        "ministral3",
+        "kimivl",
+        "qwen3-vl"
+    ] # Add more keywords as needed
     return any(k in model_id.lower() for k in keywords)
 
 # Model evaluation function
@@ -24,22 +25,11 @@ def model_eval(
     trust_remote_code: bool,
 ): 
     is_mm_model = is_multimodal_model(model_id)
-    is_mt_model = is_mistral_model(model_id)
     
     if is_mm_model:
         model = AutoModelForImageTextToText.from_pretrained(
             model_id,
             trust_remote_code=trust_remote_code,
-            dtype="auto",
-            device_map="auto"
-        )
-        processor = AutoProcessor.from_pretrained(
-            model_id,
-            trust_remote_code=trust_remote_code,
-        )
-    elif is_mt_model:
-        model = Mistral3ForConditionalGeneration.from_pretrained(
-            model_id,
             dtype="auto",
             device_map="auto"
         )
@@ -69,7 +59,7 @@ def model_eval(
     model.eval()
     model.config.use_cache = False
 
-    if is_mm_model or is_mt_model:
+    if is_mm_model:
         inputs = processor(
             images=None,
             text="Hello, can you explain yourself ? ",
