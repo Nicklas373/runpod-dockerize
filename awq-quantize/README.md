@@ -97,10 +97,9 @@ python3 model_upload.py --hf_token XXXX --repo_id YOUR_REPO_NAME --local_dir YOU
 
 ## Directory Structure
 
-- /workspace/model_inspect.py: Python based model tree inspect script
+- /workspace/model_eval.py: Python based evaluate quantized model script
 - /workspace/model_quantize.py: Python based quantization script
 - /workspace/model_upload.py: Python based upload to HF script
-- /workspace/model_eval.py: Python based evaluate quantized model script
 - /workspace/requirements.txt: Python requirements required library for mistral model
 
 ## Notes for Mistral / Ministral family

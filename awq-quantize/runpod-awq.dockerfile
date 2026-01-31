@@ -58,7 +58,7 @@ print("mamba CUDA OK")
 EOF
 
 # Copy quantization scripts into the container
-COPY model_consolidated /workspace/
+COPY model_consolidated.py /workspace/
 COPY model_eval.py /workspace/
 COPY model_quantize.py /workspace/
 COPY requirements.txt /workspace/

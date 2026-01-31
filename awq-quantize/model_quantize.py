@@ -7,6 +7,7 @@ from huggingface_hub import snapshot_download
 from io import BytesIO
 from llmcompressor import oneshot
 from llmcompressor.modifiers.awq import AWQModifier
+from llmcompressor.modifiers.smoothquant import SmoothQuantModifier
 from pathlib import Path
 from PIL import Image
 import requests
@@ -212,7 +213,6 @@ def run_awq_quantization(
                         're:.*q_proj$',
                         're:.*k_proj$',
                         're:.*v_proj$',
-                        're:.*o_proj$',
                         're:.*gate_proj$',
                         're:.*up_proj$'
                     ],
@@ -226,7 +226,7 @@ def run_awq_quantization(
                     },
                 },
                 "group_0": {
-                    "targets": ["re:.*down_proj$"],
+                    "targets": ["re:.*down_proj$", "re:.*o_proj$"],
                     "weights": {
                         "num_bits": 4,
                         "type": "int",
