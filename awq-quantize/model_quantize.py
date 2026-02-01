@@ -212,9 +212,7 @@ def run_awq_quantization(
                     "targets": [
                         're:.*q_proj$',
                         're:.*k_proj$',
-                        're:.*v_proj$',
-                        're:.*gate_proj$',
-                        're:.*up_proj$'
+                        're:.*v_proj$'
                     ],
                     "weights": {
                         "num_bits": 4,
@@ -226,7 +224,12 @@ def run_awq_quantization(
                     },
                 },
                 "group_0": {
-                    "targets": ["re:.*down_proj$", "re:.*o_proj$"],
+                    "targets": [
+                        "re:.*down_proj$",
+                        "re:.*o_proj$",
+                        "re:.*gate_proj$",
+                        "re:.*up_proj$"
+                    ],
                     "weights": {
                         "num_bits": 4,
                         "type": "int",

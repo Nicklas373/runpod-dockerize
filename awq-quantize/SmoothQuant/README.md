@@ -3,8 +3,9 @@
 ## Qwen 3 Specific
 
 ```shell
+## Should be disabled for parameter below than 14B
 SmoothQuantModifier(
-    smoothing_strength=0.8,
+    smoothing_strength=0.6,
     mappings=[
         (
             ["re:.*q_proj$", "re:.*k_proj$", "re:.*v_proj$"],
