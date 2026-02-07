@@ -3,7 +3,7 @@ FROM runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
 
 # Configure image maintainer
 LABEL maintainer="Nicklas373 <herlambangdicky5@gmail.com>"
-LABEL version="1.0.2-PROD"
+LABEL version="1.0.3-PROD"
 LABEL description="Docker container for Runpod, used for Comfy UI"
 
 # Configure environment variables
@@ -129,7 +129,7 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh
 
 # Copy sage attention and workflow to workspace
 COPY init-sageattention.sh /workspace/
-COPY 1080p_Perfect_Loops_Caravel_LumiNami_v1_1.json /workspace/ComfyUI/user/default/workflows
+COPY 1080p_Perfect_Loops_Caravel_LumiNami_v1_1.json /workspace/
 
 # Expose VS Code port
 EXPOSE 8080

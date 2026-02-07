@@ -12,7 +12,7 @@ FETCH DATA from: https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main
 [ComfyUI-Manager] All startup tasks have been completed.
 ```
 
-Comfy UI 0.9.2
+Comfy UI 0.12.3
 
 ## Access
 
@@ -86,6 +86,9 @@ Comfy UI 0.9.2
 
 ## What's New
 
+- 1.0.3 (2026-02-07)
+  - ComfyUI Version [0.12.3](https://github.com/Comfy-Org/ComfyUI/commit/17e7df43d19bde49efa46a32b89f5153b9cb0ded)
+  - Move customized workflows into root of workspace folders, instead inside of ComfyUI workflows
 - 1.0.2 (2025-01-19)
   - Add new comfy-ui flags --reserve-vram 1.0 to reserve VRAM at least 1.0 GB
   - Add customized workflows from [@LumiNami](https://civitai.com/user/LumiNami)
