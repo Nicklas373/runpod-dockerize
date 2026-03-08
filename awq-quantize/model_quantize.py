@@ -2,6 +2,8 @@
 # Reference: https://github.com/xhedit/quantkit/
 
 import argparse
+from compressed_tensors.offload import dist_init, offloaded_model
+import os, os.path
 from datasets import load_dataset, Dataset
 from huggingface_hub import snapshot_download
 from io import BytesIO
@@ -28,7 +30,8 @@ def is_multimodal_model(model_id: str) -> bool:
         "ministral",
         "ministral3",
         "kimivl",
-        "qwen3-vl"
+        "qwen3-vl",
+        "qwen3.5"
     ] # Add more keywords as needed
     return any(k in model_id.lower() for k in keywords)
 
@@ -46,6 +49,12 @@ def load_image(image):
             return Image.open(BytesIO(requests.get(image).content)).convert("RGB")
         return Image.open(image).convert("RGB")
     raise ValueError("Unsupported image format")
+
+def detect_text_column(dataset):
+    for col in dataset.column_names:
+        if col in ["text", "content", "prompt", "messages"]:
+            return col
+    return dataset.column_names[0]
 
 # --------------------------------------------------
 # 1. Download & Prepare Model Directory
@@ -94,8 +103,16 @@ def run_awq_quantization(
     # Step 1: Download/Verify local model
     model_path = get_model_path(branch, False, hf_cache, model_id)
     is_mm_model = is_multimodal_model(model_id)
+   
+    # Make sure offload cache directory exists
+    if not os.path.exists("./offload_cache"):
+        os.mkdir("./offload_cache")
+
     # Debug info
     print(f"Multimodal model detected: {is_mm_model}")
+
+    # Initialize distributed process group
+    dist_init()
 
     # Step 2: Manually load the model with the trust flag
     print(f"Loading model from {model_path}...")
@@ -104,7 +121,8 @@ def run_awq_quantization(
             model_path,
             trust_remote_code=trust_remote_code,
             dtype="auto",
-            device_map="auto"
+            device_map="cuda",
+            offload_folder="./offload_cache",
         )
         processor = AutoProcessor.from_pretrained(
             model_path,
@@ -115,7 +133,8 @@ def run_awq_quantization(
             model_path,
             trust_remote_code=trust_remote_code,
             dtype="auto",
-            device_map="auto"
+            device_map="cuda",
+            offload_folder="./offload_cache",
         )
 
     # Prepare tokenizer
@@ -129,33 +148,73 @@ def run_awq_quantization(
         tokenizer.pad_token = tokenizer.eos_token
 
     # Disable KV cache (saves VRAM during calibration)
-    model.eval()
-    model.config.use_cache = False
+    with offloaded_model(): # Enables model CT Offloading for quantization
+        model.eval()
+        model.config.use_cache = False
 
     # Step 2: Prepare Custom Dataset
     all_samples = []
 
     dataset_ids = dataset_id.split(",")
+
+    # Parse dataset configs (support multiple)
+    dataset_configs = (
+        dataset_config.split(",") if dataset_config else [None] * len(dataset_ids)
+    )
+
+    assert len(dataset_configs) == len(dataset_ids), \
+        "Number of dataset configs must match dataset_ids"
+
     if dataset_mix:
         ratios = [float(x) for x in dataset_mix.split(",")]
         assert len(ratios) == len(dataset_ids)
     else:
         ratios = [1 / len(dataset_ids)] * len(dataset_ids)
 
-    for dataset_id, ratio in zip(dataset_ids, ratios):
-        print(f"Loading dataset: {dataset_id} (ratio={ratio})")
-        ds = load_dataset(dataset_id, split=dataset_split) if dataset_config is None else load_dataset(dataset_id, dataset_config, split=dataset_split)
+    for dataset_id, dataset_config, ratio in zip(dataset_ids, dataset_configs, ratios):
+        sample_count = max(1, int(num_samples * ratio))
+        print(f"Loading dataset: {dataset_id} (ratio={ratio}, samples={sample_count})")
+        
+        # Load only a slice to avoid downloading full datasets
+        if dataset_id in ["allenai/c4"]:
+            ds = load_dataset(
+                dataset_id,
+                dataset_config,
+                split=dataset_split,
+                streaming=True
+            )
+            ds = Dataset.from_list(list(ds.take(sample_count)))
+        else:
+            if dataset_config:
+                ds = load_dataset(
+                    dataset_id,
+                    dataset_config,
+                    split=f"{dataset_split}[:{sample_count}]"
+                )
+            else:
+                ds = load_dataset(
+                    dataset_id,
+                    split=f"{dataset_split}[:{sample_count}]"
+                )
 
+        # Detect multimodal dataset
         image_column = detect_image_column(ds)
         is_mm_ds = image_column is not None
 
-        sample_count = int(num_samples * ratio)
-        ds = ds.shuffle(seed=42).select(range(min(sample_count, len(ds))))
+        text_column = detect_text_column(ds)
+        print("Detected text column:", text_column)
+
+        # Filter empty text rows (important for datasets like WikiText)
+        ds = ds.filter(lambda x: x.get(text_column) and str(x[text_column]).strip() != "")
+        
+        # Shuffle and cap samples
+        ds = ds.shuffle(seed=42)
+        ds = ds.select(range(min(sample_count, len(ds))))
 
         for row in ds:
             if is_mm_ds:
                 image = load_image(row[image_column])
-                text = row[text_column]
+                text = str(row[text_column])
 
                 inputs = processor(
                     text=text,
@@ -182,16 +241,26 @@ def run_awq_quantization(
                 else:
                     text = str(content)
 
-                all_samples.append({"text": text})
+                tokens = tokenizer(
+                    text,
+                    truncation=True,
+                    padding="max_length",
+                    max_length=max_seq_length,
+                    return_tensors="pt",
+                )
 
+                all_samples.append({
+                    "input_ids": tokens["input_ids"][0],
+                    "attention_mask": tokens["attention_mask"][0],
+                })
+
+    # Final calibration dataset
     calibration_dataset = Dataset.from_list(all_samples).shuffle(seed=42)
 
     # Step 3: Define Recipe (Standard 4-bit AWQ)
     ignore_modules = (
-            "re:.*embed_tokens",
+            "re:.*model.embed_tokens",
             "re:.*model.norm",
-            "re:.*input_layernorm$",
-            "re:.*post_attention_layernorm$",
             "re:.*lm_head",
         )
     
@@ -204,32 +273,15 @@ def run_awq_quantization(
         )
 
     recipe = [
+        SmoothQuantModifier(
+            smoothing_strength=0.6,
+        ),
         AWQModifier(
             targets=["Linear"],
             ignore=ignore_modules,
             config_groups={
-                "channel_sensitive": {
-                    "targets": [
-                        're:.*q_proj$',
-                        're:.*k_proj$',
-                        're:.*v_proj$'
-                    ],
-                    "weights": {
-                        "num_bits": 4,
-                        "type": "int",
-                        "symmetric": True,
-                        "strategy": "channel",
-                        "observer": "mse",
-                        "dynamic": False,
-                    },
-                },
-                "group_0": {
-                    "targets": [
-                        "re:.*down_proj$",
-                        "re:.*o_proj$",
-                        "re:.*gate_proj$",
-                        "re:.*up_proj$"
-                    ],
+                "main": {
+                    "targets": ["Linear"],
                     "weights": {
                         "num_bits": 4,
                         "type": "int",

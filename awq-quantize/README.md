@@ -5,30 +5,15 @@ Quantize any LLM Models into AWQ 4 Bit format by using LLM Compressor package fr
 ## Current Recipe
 
 ```shell
+SmoothQuantModifier(
+    smoothing_strength=0.6,
+),
 AWQModifier(
     targets=["Linear"],
     ignore=ignore_modules,
     config_groups={
-        "channel_sensitive": {
-            "targets": [
-                're:.*q_proj$',
-                're:.*k_proj$',
-                're:.*v_proj$',
-                're:.*o_proj$',
-                're:.*gate_proj$',
-                're:.*up_proj$'
-            ],
-            "weights": {
-                "num_bits": 4,
-                "type": "int",
-                "symmetric": True,
-                "strategy": "channel",
-                "observer": "mse",
-                "dynamic": False,
-            },
-        },
-        "group_0": {
-            "targets": ["re:.*down_proj$"],
+        "main": {
+            "targets": ["Linear"],
             "weights": {
                 "num_bits": 4,
                 "type": "int",
@@ -45,8 +30,7 @@ AWQModifier(
 
 ## Recommended Settings
 
-- **--num_samples** 256 or 512
-- **--max_seq_length** 1024 or 2048 (More length, will took longer time)
+Look at [Here](https://raw.githubusercontent.com/Nicklas373/runpod-dockerize/refs/heads/main/awq-quantize/quantize_note.md)
 
 ## How to use
 
@@ -54,7 +38,7 @@ AWQModifier(
 - Exec **model_quantize.py** with this parameters (Examples)
 
 ```shell
-python model_quantize.py --model_id "HUGGINGFACE/HUGGINGFACE_MODEL" --dataset_id DATASET1/YOUR_DATASET_1,DATASET2/YOUR_DATASET_2 --dataset_mix 0.5,0.5 --dataset_split train --text_column messages --num_samples 256 --max_seq_length 1024 --hf_cache False --branch main --trust_remote_code False --trust_remote_code_model False
+python model_quantize.py --model_id "HUGGINGFACE/HUGGINGFACE_MODEL" --dataset_id DATASET1/YOUR_DATASET_1,DATASET2/YOUR_DATASET_2 --dataset_mix 0.5,0.5 --dataset_split train --text_column messages --num_samples 512 --max_seq_length 2048 --hf_cache False --branch main --trust_remote_code False --trust_remote_code_model False
 ```
 
 - After quantization complete, before upload. You may **test models to make sure if it works at first**, run **model_eval.py** to test.
@@ -76,7 +60,7 @@ python3 model_upload.py --hf_token XXXX --repo_id YOUR_REPO_NAME --local_dir YOU
 - Exec **model_quantize.py** with this parameters (Examples)
 
 ```shell
-python model_quantize.py --model_id "HUGGINGFACE/HUGGINGFACE_MODEL" --dataset_id DATASET1/YOUR_DATASET_1,DATASET2/YOUR_DATASET_2 --dataset_mix 0.5,0.5 --dataset_split train --text_column messages --num_samples 256 --max_seq_length 1024 --hf_cache False --branch main --trust_remote_code False --trust_remote_code_model False
+python model_quantize.py --model_id "HUGGINGFACE/HUGGINGFACE_MODEL" --dataset_id DATASET1/YOUR_DATASET_1,DATASET2/YOUR_DATASET_2 --dataset_mix 0.5,0.5 --dataset_split train --text_column messages --num_samples 512 --max_seq_length 2048 --hf_cache False --branch main --trust_remote_code False --trust_remote_code_model False
 ```
 
 - After quantization complete, before upload. You may **test models to make sure if it works at first**, run **model_eval.py** to test.
@@ -97,18 +81,12 @@ python3 model_upload.py --hf_token XXXX --repo_id YOUR_REPO_NAME --local_dir YOU
 
 ## Directory Structure
 
+- /workspace/model_consolidated.py: Python based Llama model consolidation script
 - /workspace/model_eval.py: Python based evaluate quantized model script
+- /workspace/model_perplexity.py: Python based calculate perplexity score
 - /workspace/model_quantize.py: Python based quantization script
 - /workspace/model_upload.py: Python based upload to HF script
 - /workspace/requirements.txt: Python requirements required library for mistral model
-
-## Notes for Mistral / Ministral family
-
-- Run install requirements.txt before run or proceed with quantization
-
-```shell
-pip install -r requirements.txt
-```
 
 ## Python package requirements
 
@@ -120,28 +98,3 @@ pip install -r requirements.txt
 - llmcompressor
 - mamba-ssm
 - transformers
-
-## Explanation for **model_quantize.py**
-
-- **model_id**: HuggingFace Model Name (Required)
-- **dataset_id**: HuggingFace Dataset ID (Required), can have multiple datasets with comma-separated ratios, e.g. xyz/xx1,xyz/xx2
-- **dataset_config**: Dataset configuration name (if applicable).
-- **dataset_mix**: Combine multiple datasets with comma-separated ratios, e.g. 0.7,0.3
-- **dataset_split**: Split of the dataset to use for calibration (e.g. 'train', 'validation'). Ignored if --dataset_id is not provided
-- **text_column**: Name of the column containing text data in the dataset. Required when --dataset_id is provided. If the column contains a list of messages, their 'content' fields ""will be concatenated"
-- **num_samples**: Number of samples used for AWQ calibration. More samples can improve accuracy but require more VRAM and time. Typical values: 128 to 512
-- **max_seq_length**: Maximum sequence length (in tokens) used during calibration. Longer sequences improve weight calibration for long-context models but increase VRAM usage
-- **trust_remote_code**: Whether to trust and execute custom model code from the Hugging Face repository. Required for many community models.
-- **trust_remote_code_model**: Whether to trust and execute custom model code when loading the model. Required for many community models.
-
-## Explanation for **model_eval.py**
-
-- **model_id**: Quantized model folder (ex: llm_awq)
-- **trust_remote_code**: Whether to trust and execute custom model code from the Hugging Face repository. Required for many community models.
-
-## Explanation for **model_upload.py**
-
-- **hf_token**: Hugging Face user token
-- **repo_id**: Hugging Face repository target (eg: hello:my_llm)
-- **local_dir**: Hugging Face local folder directory
-- **repo_type**: Repository type (default: model)
