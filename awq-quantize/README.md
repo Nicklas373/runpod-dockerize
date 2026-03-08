@@ -30,7 +30,7 @@ AWQModifier(
 
 ## Recommended Settings
 
-Look at [Here](https://raw.githubusercontent.com/Nicklas373/runpod-dockerize/refs/heads/main/awq-quantize/quantize_note.md)
+Look at [Here](https://raw.githubusercontent.com/Nicklas373/runpod-dockerize/refs/heads/main/awq-quantize/Note/quantize_note.md)
 
 ## How to use
 
