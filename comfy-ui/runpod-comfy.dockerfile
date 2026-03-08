@@ -139,4 +139,4 @@ EXPOSE 8083
 
 # Set entrypoint and default command
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["bash", "-c", "code-server $CODE_SERVER_ARGS /workspace & python3 ComfyUI/main.py --use-sage-attention --listen 0.0.0.0 --port 8083 --reserve-vram 1.0"]
+CMD ["bash", "-c", "code-server $CODE_SERVER_ARGS /workspace & python3 ComfyUI/main.py --use-sage-attention --listen 0.0.0.0 --port 8083"]

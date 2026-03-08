@@ -12,7 +12,7 @@ FETCH DATA from: https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main
 [ComfyUI-Manager] All startup tasks have been completed.
 ```
 
-Comfy UI 0.12.3
+Comfy UI 0.16.3
 
 ## Access
 
@@ -86,6 +86,9 @@ Comfy UI 0.12.3
 
 ## What's New
 
+- 1.0.4 (2026-03-07)
+  - ComfyUI Version [0.16.3](https://github.com/Comfy-Org/ComfyUI/commit/6ac8152fc80734b084d12865460e5e9a5d9a4e1b)
+  - Remove comfy-ui flags --reserve-vram 1.0 to reserve VRAM at least 1.0 GB [As request]
 - 1.0.3 (2026-02-07)
   - ComfyUI Version [0.12.3](https://github.com/Comfy-Org/ComfyUI/commit/17e7df43d19bde49efa46a32b89f5153b9cb0ded)
   - Move customized workflows into root of workspace folders, instead inside of ComfyUI workflows
