@@ -2,8 +2,6 @@
 # Reference: https://github.com/xhedit/quantkit/
 
 import argparse
-from compressed_tensors.offload import dist_init, offloaded_model
-import os, os.path
 from datasets import load_dataset, Dataset
 from huggingface_hub import snapshot_download
 from io import BytesIO
@@ -103,16 +101,9 @@ def run_awq_quantization(
     # Step 1: Download/Verify local model
     model_path = get_model_path(branch, False, hf_cache, model_id)
     is_mm_model = is_multimodal_model(model_id)
-   
-    # Make sure offload cache directory exists
-    if not os.path.exists("./offload_cache"):
-        os.mkdir("./offload_cache")
 
     # Debug info
     print(f"Multimodal model detected: {is_mm_model}")
-
-    # Initialize distributed process group
-    dist_init()
 
     # Step 2: Manually load the model with the trust flag
     print(f"Loading model from {model_path}...")
@@ -122,7 +113,6 @@ def run_awq_quantization(
             trust_remote_code=trust_remote_code,
             dtype="auto",
             device_map="cuda",
-            offload_folder="./offload_cache",
         )
         processor = AutoProcessor.from_pretrained(
             model_path,
@@ -134,7 +124,6 @@ def run_awq_quantization(
             trust_remote_code=trust_remote_code,
             dtype="auto",
             device_map="cuda",
-            offload_folder="./offload_cache",
         )
 
     # Prepare tokenizer
@@ -148,9 +137,8 @@ def run_awq_quantization(
         tokenizer.pad_token = tokenizer.eos_token
 
     # Disable KV cache (saves VRAM during calibration)
-    with offloaded_model(): # Enables model CT Offloading for quantization
-        model.eval()
-        model.config.use_cache = False
+    model.eval()
+    model.config.use_cache = False
 
     # Step 2: Prepare Custom Dataset
     all_samples = []

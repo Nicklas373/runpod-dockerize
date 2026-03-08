@@ -1,13 +1,11 @@
 import argparse
 import math
-import os, os.path
 import torch
 from datasets import load_dataset
 from transformers import (
     AutoModelForCausalLM,
     AutoModelForImageTextToText,
     AutoTokenizer,
-    AutoProcessor,
 )
 from tqdm import tqdm
 
@@ -21,7 +19,8 @@ def is_multimodal_model(model_id: str) -> bool:
         "ministral",
         "ministral3",
         "kimivl",
-        "qwen3-vl"
+        "qwen3-vl",
+        "qwen3.5"
     ] # Add more keywords as needed
     return any(k in model_id.lower() for k in keywords)
 
@@ -29,13 +28,6 @@ def is_multimodal_model(model_id: str) -> bool:
 # 1. Load AWQ model + tokenizer
 # ------------------------------------------------
 def run_perplexity(model_id: str):
-    # Make sure offload cache directory exists
-    if not os.path.exists("./offload_cache"):
-        os.mkdir("./offload_cache")
-
-    # Initialize distributed process group
-    dist_init()
-
     # Initialize multimodal model flag
     is_mm_model = is_multimodal_model(model_id)
 
@@ -47,7 +39,6 @@ def run_perplexity(model_id: str):
             trust_remote_code=True,
             dtype="auto",
             device_map="cuda",
-            offload_folder="./offload_cache",
         )
     else:
         model = AutoModelForCausalLM.from_pretrained(
@@ -55,13 +46,16 @@ def run_perplexity(model_id: str):
             trust_remote_code=True,
             dtype="auto",
             device_map="cuda",
-            offload_folder="./offload_cache",
         )
     
     # Load tokenizer and model with offloading
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    # Disable KV cache (saves VRAM during calibration)
+    model.eval()
+    model.config.use_cache = False
 
     # ------------------------------------------------
     # 2. Load WikiText-2 (benchmark standard)

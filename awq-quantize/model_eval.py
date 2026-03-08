@@ -1,7 +1,5 @@
 # Import required variables and libraries
 import argparse
-import os, os.path
-from compressed_tensors.offload import dist_init, offloaded_model
 from transformers import (
     AutoModelForCausalLM,
     AutoModelForImageTextToText,
@@ -17,7 +15,8 @@ def is_multimodal_model(model_id: str) -> bool:
         "ministral",
         "ministral3",
         "kimivl",
-        "qwen3-vl"
+        "qwen3-vl",
+        "qwen3.5"
     ] # Add more keywords as needed
     return any(k in model_id.lower() for k in keywords)
 
@@ -26,13 +25,6 @@ def model_eval(
     model_id: str,
     trust_remote_code: bool,
 ): 
-    # Make sure offload cache directory exists
-    if not os.path.exists("./offload_cache"):
-        os.mkdir("./offload_cache")
-
-    # Initialize distributed process group
-    dist_init()
-
     is_mm_model = is_multimodal_model(model_id)
     
     if is_mm_model:
@@ -41,7 +33,6 @@ def model_eval(
             trust_remote_code=trust_remote_code,
             dtype="auto",
             device_map="cuda",
-            offload_folder="./offload_cache",
         )
         processor = AutoProcessor.from_pretrained(
             model_id,
@@ -53,7 +44,6 @@ def model_eval(
             trust_remote_code=trust_remote_code,
             dtype="auto",
             device_map="cuda",
-            offload_folder="./offload_cache",
         )
 
     # Prepare tokenizer
@@ -67,9 +57,8 @@ def model_eval(
         tokenizer.pad_token = tokenizer.eos_token
 
     # Disable KV cache (saves VRAM during calibration)
-    with offloaded_model(): # Enables model CT Offloading for quantization
-        model.eval()
-        model.config.use_cache = False
+    model.eval()
+    model.config.use_cache = False
 
     if is_mm_model:
         inputs = processor(
