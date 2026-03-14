@@ -1,9 +1,9 @@
-# Use runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404 as base image
-FROM runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
+# Use runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404 as base image
+FROM runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404
 
 # Configure image maintainer
 LABEL maintainer="Nicklas373 <herlambangdicky5@gmail.com>"
-LABEL version="1.0.3-PROD"
+LABEL version="1.1.0-PROD"
 LABEL description="Docker container for Runpod, used for Comfy UI"
 
 # Configure environment variables
@@ -115,6 +115,7 @@ RUN cd /workspace/ComfyUI/custom_nodes && \
     git clone https://github.com/vrgamegirl19/comfyui-vrgamedevgirl && \
     git clone https://github.com/ltdrdata/ComfyUI-Impact-Pack && \
     git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler && \
+    git clone https://github.com/WASasquatch/was-node-suite-comfyui && \
     for d in */; do \
         if [ -f "$d/requirements.txt" ]; then \
             uv pip install -r "$d/requirements.txt"; \
@@ -129,7 +130,10 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh
 
 # Copy sage attention and workflow to workspace
 COPY init-sageattention.sh /workspace/
-COPY 1080p_Perfect_Loops_Caravel_LumiNami_v1_1.json /workspace/
+COPY Reasoning_Loops_v1_0.json /workspace/
+
+# Create blank folder for SEEDVR2
+RUN mkdir /workspace/ComfyUI/models
 
 # Expose VS Code port
 EXPOSE 8080

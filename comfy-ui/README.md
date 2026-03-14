@@ -75,6 +75,7 @@ Comfy UI 0.16.3
 - [comfyui-vrgamedevgirl](https://github.com/vrgamegirl19/comfyui-vrgamedevgirl)
 - [ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack)
 - [ComfyUI-SeedVR2_VideoUpscaler](https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler)
+- [was-node-suite-comfyui](https://github.com/WASasquatch/was-node-suite-comfyui)
 
 ## SageAttention Custom Install (For NVIDIA Blackwell Architecture)
 
@@ -86,6 +87,13 @@ Comfy UI 0.16.3
 
 ## What's New
 
+- 1.1.0 (2026-03-14)
+  - Add blank “SEEDVR2” folder in /models
+  - Add was-node-suite in /custom-nodes
+  - ComfyUI Version [0.17.1](https://github.com/Comfy-Org/ComfyUI/commit/16cd8d8a8f5f16ce7e5f929fdba9f783990254ea)
+  - Replace old workflow with “Reasoning Loops v1_0.json”
+  - Update Pytorch container to version 2.9.1 with cuda 13.0 (runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404)
+- Links : https://github.com/WASasquatch/was-node-suite-comfyui
 - 1.0.4 (2026-03-07)
   - ComfyUI Version [0.16.3](https://github.com/Comfy-Org/ComfyUI/commit/6ac8152fc80734b084d12865460e5e9a5d9a4e1b)
   - Remove comfy-ui flags --reserve-vram 1.0 to reserve VRAM at least 1.0 GB [As request]
