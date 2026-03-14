@@ -4,13 +4,14 @@
 
 ```shell
  awq_mappings = []
+ num_layers = model.config.num_hidden_layers
 
-    for i in range(32):
-    # Linear Attn: qkv -> out
+ for i in range(num_layers):
+    # Attention: qkv -> out
     awq_mappings.append(
         AWQMapping(
-            smooth_layer=f"model.language_model.layers.{i}.linear_attn.in_proj_qkv.weight",
-            balance_layers=[f"model.language_model.layers.{i}.linear_attn.out_proj.weight"],
+            smooth_layer=f"model.language_model.layers.{i}.linear_attn.in_proj_qkv",
+            balance_layers=[f"model.language_model.layers.{i}.linear_attn.out_proj"],
         )
     )
 
@@ -22,7 +23,7 @@
         )
     )
 
-    # MLP gate -> up
+    # MLP: gate -> up
     awq_mappings.append(
         AWQMapping(
             smooth_layer=f"model.language_model.layers.{i}.mlp.gate_proj",

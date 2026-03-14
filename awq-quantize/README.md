@@ -32,7 +32,7 @@ AWQModifier(
 
 - [Perplexity Score](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/Note/perplexity.md)
 - [Quantization Note](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/Note/quantize_note.md)
-- [Qwen3_5 Support](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/qwen3_5/README.md)
+- [Qwen3_5 Support](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/llmcompressor-patch/qwen3_5/README.md)
 - [SmoothQuant](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/SmoothQuant/README.md)
 
 ## How to use

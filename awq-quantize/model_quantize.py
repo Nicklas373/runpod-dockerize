@@ -292,6 +292,8 @@ def run_awq_quantization(
             "re:.*model.embed_tokens",
             "re:.*model.norm",
             "re:.*lm_head",
+            # "re:.*A_log", # Only for qwen 3_5
+            # "re:.*dt_bias", # Only for qwen 3_5
         )
     
     # Define specific ignored modules, mappings and recipe for multimodal model
@@ -301,7 +303,7 @@ def run_awq_quantization(
             "re:.*vision_encoder.*",
             "re:.*multi_modal_projector.*",
             "re:model[.]visual.*",
-            "re:.*patch_conv.*",
+            # "re:.*patch_conv.*", # Only for apriel 1.6
         )
 
         awq_mappings = [
