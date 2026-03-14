@@ -54,6 +54,10 @@ RUN uv pip install -r /workspace/ComfyUI/requirements.txt
 RUN uv pip install -r /workspace/ComfyUI/manager_requirements.txt
 RUN uv pip install -r /workspace/requirements.txt
 
+# Re-configure pytorch before init sage attention
+RUN uv pip uninstall torch torchvision torchaudio
+RUN uv pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu130
+
 # Install sage attention 2
 RUN git clone https://github.com/thu-ml/SageAttention.git
 RUN cd SageAttention && python3 setup.py install
@@ -133,7 +137,7 @@ COPY init-sageattention.sh /workspace/
 COPY Reasoning_Loops_v1_0.json /workspace/
 
 # Create blank folder for SEEDVR2
-RUN mkdir /workspace/ComfyUI/models
+RUN mkdir /workspace/ComfyUI/models/SEEDVR2
 
 # Expose VS Code port
 EXPOSE 8080
