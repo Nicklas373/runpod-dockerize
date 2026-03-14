@@ -28,9 +28,12 @@ AWQModifier(
 )
 ```
 
-## Recommended Settings
+## Recommendation Content
 
-Look at [Here](https://raw.githubusercontent.com/Nicklas373/runpod-dockerize/refs/heads/main/awq-quantize/Note/quantize_note.md)
+- [Perplexity Score](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/Note/perplexity.md)
+- [Quantization Note](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/Note/quantize_note.md)
+- [Qwen3_5 Support](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/qwen3_5/README.md)
+- [SmoothQuant](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/SmoothQuant/README.md)
 
 ## How to use
 
