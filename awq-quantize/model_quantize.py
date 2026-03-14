@@ -2,15 +2,17 @@
 # Reference: https://github.com/xhedit/quantkit/
 
 import argparse
+from compressed_tensors.offload import load_offloaded_model
 from datasets import load_dataset, Dataset
 from huggingface_hub import snapshot_download
 from io import BytesIO
 from llmcompressor import oneshot
-from llmcompressor.modifiers.awq import AWQModifier
-from llmcompressor.modifiers.smoothquant import SmoothQuantModifier
+from llmcompressor.modifiers.awq import AWQModifier, AWQMapping
+from llmcompressor.modifiers.transform.smoothquant import SmoothQuantModifier
 from pathlib import Path
 from PIL import Image
 import requests
+import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoModelForImageTextToText,
@@ -49,10 +51,31 @@ def load_image(image):
     raise ValueError("Unsupported image format")
 
 def detect_text_column(dataset):
-    for col in dataset.column_names:
-        if col in ["text", "content", "prompt", "messages"]:
+    preferred = [
+        "caption",
+        "captions",
+        "text",
+        "content",
+        "prompt",
+        "question",
+        "messages",
+    ]
+
+    for col in preferred:
+        if col in dataset.column_names:
+            print(f"Using text column: {col}")
             return col
-    return dataset.column_names[0]
+
+    # fallback: first string column
+    for col in dataset.column_names:
+        try:
+            if dataset.features[col].dtype == "string":
+                print(f"Fallback text column: {col}")
+                return col
+        except:
+            continue
+
+    raise ValueError("No valid text column found")
 
 # --------------------------------------------------
 # 1. Download & Prepare Model Directory
@@ -108,23 +131,23 @@ def run_awq_quantization(
     # Step 2: Manually load the model with the trust flag
     print(f"Loading model from {model_path}...")
     if is_mm_model:
-        model = AutoModelForImageTextToText.from_pretrained(
-            model_path,
-            trust_remote_code=trust_remote_code,
-            dtype="auto",
-            device_map="cuda",
-        )
-        processor = AutoProcessor.from_pretrained(
-            model_path,
-            trust_remote_code=trust_remote_code,
-        )
+        with load_offloaded_model():
+            model = AutoModelForImageTextToText.from_pretrained(
+                model_path,
+                trust_remote_code=trust_remote_code,
+                dtype="auto",
+                device_map="auto",
+                offload_folder="./offload_model",
+            )
     else:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            trust_remote_code=trust_remote_code,
-            dtype="auto",
-            device_map="cuda",
-        )
+        with load_offloaded_model():
+            model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                trust_remote_code=trust_remote_code,
+                dtype="auto",
+                device_map="auto",
+                offload_folder="./offload_model",
+            )
 
     # Prepare tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
@@ -139,6 +162,7 @@ def run_awq_quantization(
     # Disable KV cache (saves VRAM during calibration)
     model.eval()
     model.config.use_cache = False
+    torch.set_grad_enabled(False)
 
     # Step 2: Prepare Custom Dataset
     all_samples = []
@@ -150,12 +174,10 @@ def run_awq_quantization(
         dataset_config.split(",") if dataset_config else [None] * len(dataset_ids)
     )
 
-    assert len(dataset_configs) == len(dataset_ids), \
-        "Number of dataset configs must match dataset_ids"
+    assert len(dataset_configs) == len(dataset_ids)
 
     if dataset_mix:
         ratios = [float(x) for x in dataset_mix.split(",")]
-        assert len(ratios) == len(dataset_ids)
     else:
         ratios = [1 / len(dataset_ids)] * len(dataset_ids)
 
@@ -192,8 +214,11 @@ def run_awq_quantization(
         text_column = detect_text_column(ds)
         print("Detected text column:", text_column)
 
-        # Filter empty text rows (important for datasets like WikiText)
-        ds = ds.filter(lambda x: x.get(text_column) and str(x[text_column]).strip() != "")
+        if not is_mm_ds:
+            # Filter empty text rows (important for datasets like WikiText)
+            ds = ds.filter(lambda x: x.get(text_column) and str(x[text_column]).strip() != "")
+        elif is_mm_ds:
+            ds = ds.filter(lambda x: x.get(image_column) is not None)
         
         # Shuffle and cap samples
         ds = ds.shuffle(seed=42)
@@ -201,31 +226,48 @@ def run_awq_quantization(
 
         for row in ds:
             if is_mm_ds:
-                image = load_image(row[image_column])
-                text = str(row[text_column])
+                try: 
+                    content = row.get(text_column)
 
-                inputs = processor(
-                    text=text,
-                    images=image,
-                    return_tensors="pt",
-                    padding="max_length",
-                    truncation=True,
-                    max_length=max_seq_length,
-                )
+                    if not content:
+                        continue
 
-                all_samples.append({
-                    "input_ids": inputs["input_ids"][0],
-                    "attention_mask": inputs["attention_mask"][0],
-                    "pixel_values": inputs["pixel_values"][0],
-                })
+                    # handle list captions safely
+                    if isinstance(content, list):
+                        text = " ".join(str(x) for x in content)
+                    else:
+                        text = str(content)
+
+                    tokens = tokenizer(
+                        text,
+                        truncation=True,
+                        padding="max_length",
+                        max_length=max_seq_length,
+                        return_tensors="pt",
+                    )
+
+                    all_samples.append({
+                        "input_ids": tokens["input_ids"][0],
+                        "attention_mask": tokens["attention_mask"][0],
+                    })
+                
+                except Exception as e:
+                    print("Skipping corrupted sample:", e)
+                    continue
             else:
-                content = row[text_column]
+                content = row.get(text_column)
+
+                if not content:
+                    continue
+
                 if isinstance(content, list):
+
                     text = tokenizer.apply_chat_template(
                         content,
                         tokenize=False,
                         add_generation_prompt=False,
                     )
+
                 else:
                     text = str(content)
 
@@ -252,42 +294,85 @@ def run_awq_quantization(
             "re:.*lm_head",
         )
     
+    # Define specific ignored modules, mappings and recipe for multimodal model
     if is_mm_model:
         ignore_modules += (
             "re:.*vision_tower.*",
             "re:.*vision_encoder.*",
             "re:.*multi_modal_projector.*",
             "re:model[.]visual.*",
+            "re:.*patch_conv.*",
         )
 
-    recipe = [
-        SmoothQuantModifier(
-            smoothing_strength=0.6,
-        ),
-        AWQModifier(
-            targets=["Linear"],
-            ignore=ignore_modules,
-            config_groups={
-                "main": {
-                    "targets": ["Linear"],
-                    "weights": {
-                        "num_bits": 4,
-                        "type": "int",
-                        "symmetric": True,
-                        "strategy": "group",
-                        "group_size": 32,
-                        "observer": "mse",
-                        "dynamic": False,
-                    },
-                }
-            },
-        )
-    ]
+        awq_mappings = [
+            AWQMapping(
+                smooth_layer="re:model.language_model.layers.*.input_layernorm",
+                balance_layers=[
+                    "re:model.language_model.layers.*.q_proj",
+                    "re:model.language_model.layers.*.k_proj",
+                    "re:model.language_model.layers.*.v_proj",
+                ],
+            ),
+            AWQMapping(
+                smooth_layer="re:model.language_model.layers.*.post_attention_layernorm",
+                balance_layers=[
+                    "re:model.language_model.layers.*.gate_proj",
+                    "re:model.language_model.layers.*.up_proj",
+                ],
+            ),
+        ]
+
+        recipe = [
+            AWQModifier(
+                targets=["Linear"],
+                ignore=ignore_modules,
+                mappings=awq_mappings,
+                config_groups={
+                    "main": {
+                        "targets": ["Linear"],
+                        "weights": {
+                            "num_bits": 4,
+                            "type": "int",
+                            "symmetric": True,
+                            "strategy": "group",
+                            "group_size": 32,
+                            "observer": "mse",
+                            "dynamic": False,
+                        },
+                    }
+                },
+            )
+        ]
+    else:
+        recipe = [
+            AWQModifier(
+                targets=["Linear"],
+                ignore=ignore_modules,
+                config_groups={
+                    "main": {
+                        "targets": ["Linear"],
+                        "weights": {
+                            "num_bits": 4,
+                            "type": "int",
+                            "symmetric": True,
+                            "strategy": "group",
+                            "group_size": 32,
+                            "observer": "mse",
+                            "dynamic": False,
+                        },
+                    }
+                },
+            )
+        ]
 
     # Step 4: Run Oneshot Quantization
     output_dir = f"{model_path.name}-AWQ"
 
     print(f"Starting AWQ quantization. Output: {output_dir}")
+
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.set_float32_matmul_precision("high")
+
     oneshot(
         model=model, # Pass the local directory string
         dataset=calibration_dataset,

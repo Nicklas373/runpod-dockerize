@@ -36,17 +36,22 @@ WORKDIR /workspace
 # Install and upgrade pip, setuptools, and wheel
 RUN python3 -m pip install --upgrade pip setuptools wheel
 
-# Debug Torch Version
-RUN python3 - <<EOF
-import torch
-print("Torch version:", torch.__version__)
-EOF
-
 # Install specific Nvidia Nemotron packages
 RUN pip install causal-conv1d==1.6.0 mamba-ssm==2.3.0 --no-build-isolation --no-cache-dir -v
 
 # Install Python dependencies
 RUN pip install accelerate datasets huggingface-hub hf-transfer llmcompressor transformers
+
+# Install torchvision
+RUN pip install pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu130
+
+# Debug Torch Version
+RUN python3 - <<EOF
+import torch
+print("Torch version:", torch.__version__)
+print("TorchVision version:", torchvision.__version__)
+print("TorchAudio version:", torchaudio.__version__)
+EOF
 
 # Debug Mamba SSM Version
 RUN python3 - <<EOF
@@ -56,6 +61,9 @@ print("Mamba SSM version:", mamba_ssm.__version__)
 print("Selective Scan Function:", selective_scan_fn)
 print("mamba CUDA OK")
 EOF
+
+# Create Offload Folder
+RUN mkdir /workspace/offload_model
 
 # Copy quantization scripts into the container
 COPY model_consolidated.py /workspace/

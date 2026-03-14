@@ -1,5 +1,7 @@
 # Import required variables and libraries
 import argparse
+import torch
+from compressed_tensors.offload import load_offloaded_model
 from transformers import (
     AutoModelForCausalLM,
     AutoModelForImageTextToText,
@@ -28,23 +30,27 @@ def model_eval(
     is_mm_model = is_multimodal_model(model_id)
     
     if is_mm_model:
-        model = AutoModelForImageTextToText.from_pretrained(
-            model_id,
-            trust_remote_code=trust_remote_code,
-            dtype="auto",
-            device_map="cuda",
-        )
-        processor = AutoProcessor.from_pretrained(
-            model_id,
-            trust_remote_code=trust_remote_code,
-        )
+        with load_offloaded_model():
+            model = AutoModelForImageTextToText.from_pretrained(
+                model_id,
+                trust_remote_code=trust_remote_code,
+                dtype="auto",
+                device_map="auto",
+                offload_folder="./offload_model",
+            )
+            processor = AutoProcessor.from_pretrained(
+                model_id,
+                trust_remote_code=trust_remote_code,
+            )
     else:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_id,
-            trust_remote_code=trust_remote_code,
-            dtype="auto",
-            device_map="cuda",
-        )
+        with load_offloaded_model():
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id,
+                trust_remote_code=trust_remote_code,
+                dtype="auto",
+                device_map="auto",
+                offload_folder="./offload_model",
+            )
 
     # Prepare tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
@@ -59,23 +65,28 @@ def model_eval(
     # Disable KV cache (saves VRAM during calibration)
     model.eval()
     model.config.use_cache = False
+    torch.set_grad_enabled(False)
+
+    prompt = "Explain what a neural network is in simple terms."
 
     if is_mm_model:
         inputs = processor(
-            images=None,
-            text="Hello, can you explain yourself ? ",
+            text=prompt,
             return_tensors="pt"
         ).to(model.device)
     else:
         inputs = tokenizer(
-            "Hello, can you explain yourself ? ",
+            prompt,
             return_tensors="pt"
         ).to(model.device)
 
-    out = model.generate(
-        **inputs,
-        max_new_tokens=50,
-    )
+    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+
+    with torch.no_grad():
+        out = model.generate(
+            **inputs,
+            max_new_tokens=50,
+        )
 
     return print(tokenizer.decode(out[0], skip_special_tokens=True))
 
