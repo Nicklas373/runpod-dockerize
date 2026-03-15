@@ -12,7 +12,7 @@ FETCH DATA from: https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main
 [ComfyUI-Manager] All startup tasks have been completed.
 ```
 
-Comfy UI 0.16.3
+Comfy UI 0.17.1
 
 ## Access
 
@@ -91,16 +91,15 @@ Comfy UI 0.16.3
   - Add blank “SEEDVR2” folder in /models
   - Add was-node-suite in /custom-nodes
   - ComfyUI Version [0.17.1](https://github.com/Comfy-Org/ComfyUI/commit/16cd8d8a8f5f16ce7e5f929fdba9f783990254ea)
-  - Replace old workflow with “Reasoning Loops v1_0.json”
+  - Replace old workflow with “Reasoning Loops v1_0.json” from [@LumiNami](https://civitai.com/user/LumiNami)
   - Update Pytorch container to version 2.9.1 with cuda 13.0 (runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404)
-- Links : https://github.com/WASasquatch/was-node-suite-comfyui
 - 1.0.4 (2026-03-07)
   - ComfyUI Version [0.16.3](https://github.com/Comfy-Org/ComfyUI/commit/6ac8152fc80734b084d12865460e5e9a5d9a4e1b)
   - Remove comfy-ui flags --reserve-vram 1.0 to reserve VRAM at least 1.0 GB [As request]
 - 1.0.3 (2026-02-07)
   - ComfyUI Version [0.12.3](https://github.com/Comfy-Org/ComfyUI/commit/17e7df43d19bde49efa46a32b89f5153b9cb0ded)
   - Move customized workflows into root of workspace folders, instead inside of ComfyUI workflows
-- 1.0.2 (2025-01-19)
+- 1.0.2 (2026-01-19)
   - Add new comfy-ui flags --reserve-vram 1.0 to reserve VRAM at least 1.0 GB
   - Add customized workflows from [@LumiNami](https://civitai.com/user/LumiNami)
   - ComfyUI Version [0.9.2](https://github.com/Comfy-Org/ComfyUI/commit/1a72bf20469dee31ad156f819c14f0172cbad222)
