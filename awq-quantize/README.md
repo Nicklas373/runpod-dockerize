@@ -30,9 +30,9 @@ AWQModifier(
 
 ## Recommendation Content
 
+- [Additional Patch](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/Patch/README.md)
 - [Perplexity Score](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/Note/perplexity.md)
 - [Quantization Note](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/Note/quantize_note.md)
-- [Qwen3_5 Support](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/llmcompressor-patch/README.md)
 - [SmoothQuant](https://github.com/Nicklas373/runpod-dockerize/blob/main/awq-quantize/SmoothQuant/README.md)
 
 ## How to use
@@ -89,15 +89,17 @@ python3 model_upload.py --hf_token XXXX --repo_id YOUR_REPO_NAME --local_dir YOU
 - /workspace/model_perplexity.py: Python based calculate perplexity score
 - /workspace/model_quantize.py: Python based quantization script
 - /workspace/model_upload.py: Python based upload to HF script
-- /workspace/requirements.txt: Python requirements required library for mistral model
 
 ## Python package requirements
 
 - accelerate
 - causal-conv1d
 - datasets
+- flash-linear-attention
 - huggingface-hub
 - hf-transfer
 - llmcompressor
+- lm_eval
 - mamba-ssm
 - transformers
+- vllm

@@ -3,6 +3,7 @@
 
 import argparse
 from compressed_tensors.offload import load_offloaded_model
+from compressed_tensors.utils import save_mtp_tensors_to_checkpoint
 from datasets import load_dataset, Dataset
 from huggingface_hub import snapshot_download
 from io import BytesIO
@@ -14,8 +15,10 @@ from PIL import Image
 import requests
 import torch
 from transformers import (
-    AutoModelForCausalLM,
-    AutoModelForImageTextToText,
+    # Qwen3_5ForCausalLM, // Use only for Qwen3.5 base models without vision
+    # Qwen3_5ForConditionalGeneration, // Use only for Qwen3.5 multimodal models
+    AutoModelForCausalLM, # Use for general causal language models (e.g. Qwen3.5 base)
+    AutoModelForImageTextToText, # Use for general multimodal models (e.g. Qwen3.5 multimodal)
     AutoTokenizer,
     AutoProcessor,
 )
@@ -150,10 +153,20 @@ def run_awq_quantization(
             )
 
     # Prepare tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_path,
-        trust_remote_code=trust_remote_code,
-    )
+    if is_mm_model:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_path,
+            trust_remote_code=trust_remote_code,
+        )
+        processor = AutoProcessor.from_pretrained(
+            model_path,
+            trust_remote_code=trust_remote_code,
+        )
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_path,
+            trust_remote_code=trust_remote_code,
+        )
 
     # Ensure pad token exists (important for batching)
     if tokenizer.pad_token is None:
@@ -184,7 +197,7 @@ def run_awq_quantization(
     for dataset_id, dataset_config, ratio in zip(dataset_ids, dataset_configs, ratios):
         sample_count = max(1, int(num_samples * ratio))
         print(f"Loading dataset: {dataset_id} (ratio={ratio}, samples={sample_count})")
-        
+
         # Load only a slice to avoid downloading full datasets
         if dataset_id in ["allenai/c4"]:
             ds = load_dataset(
@@ -219,14 +232,14 @@ def run_awq_quantization(
             ds = ds.filter(lambda x: x.get(text_column) and str(x[text_column]).strip() != "")
         elif is_mm_ds:
             ds = ds.filter(lambda x: x.get(image_column) is not None)
-        
+
         # Shuffle and cap samples
         ds = ds.shuffle(seed=42)
         ds = ds.select(range(min(sample_count, len(ds))))
 
         for row in ds:
             if is_mm_ds:
-                try: 
+                try:
                     content = row.get(text_column)
 
                     if not content:
@@ -250,7 +263,7 @@ def run_awq_quantization(
                         "input_ids": tokens["input_ids"][0],
                         "attention_mask": tokens["attention_mask"][0],
                     })
-                
+
                 except Exception as e:
                     print("Skipping corrupted sample:", e)
                     continue
@@ -292,10 +305,11 @@ def run_awq_quantization(
             "re:.*model.embed_tokens",
             "re:.*model.norm",
             "re:.*lm_head",
-            # "re:.*A_log", # Only for qwen 3_5
-            # "re:.*dt_bias", # Only for qwen 3_5
+            # "re:.*embed_tokens", # Only for qwen 3_5
+            # "re:.*lm_head", # Only for qwen 3_5
+            # "re:mtp.*", # Only for qwen 3_5
         )
-    
+
     # Define specific ignored modules, mappings and recipe for multimodal model
     if is_mm_model:
         ignore_modules += (
@@ -304,8 +318,10 @@ def run_awq_quantization(
             "re:.*multi_modal_projector.*",
             "re:model[.]visual.*",
             # "re:.*patch_conv.*", # Only for apriel 1.6
+            # "re:.*linear_attn.*", # Only for qwen 3.5 multimodal
         )
 
+        # Define general mappings for Qwen 3 Family
         awq_mappings = [
             AWQMapping(
                 smooth_layer="re:model.language_model.layers.*.input_layernorm",
@@ -337,7 +353,7 @@ def run_awq_quantization(
                             "type": "int",
                             "symmetric": True,
                             "strategy": "group",
-                            "group_size": 32,
+                            "group_size": 32, 
                             "observer": "mse",
                             "dynamic": False,
                         },
@@ -384,6 +400,11 @@ def run_awq_quantization(
         output_dir=output_dir,
         trust_remote_code_model=trust_remote_code_model,
     )
+
+    # Step 5: Save Quantized Model & Tokenizer & Processor
+    tokenizer.save_pretrained(output_dir)
+    processor.save_pretrained(output_dir)
+    # save_mtp_tensors_to_checkpoint(source_model=model_path, dest_dir=output_dir) # Only needed if the original model uses MTP offloading. Check the original model repo or Hugging Face Hub to confirm if this step is necessary.
 
     print(f"Success! Quantized model saved to {output_dir}")
 

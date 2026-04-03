@@ -3,33 +3,23 @@
 ## Qwen 3.5
 
 ```shell
- awq_mappings = []
- num_layers = model.config.num_hidden_layers
-
- for i in range(num_layers):
-    # Attention: qkv -> out
-    awq_mappings.append(
-        AWQMapping(
-            smooth_layer=f"model.language_model.layers.{i}.linear_attn.in_proj_qkv",
-            balance_layers=[f"model.language_model.layers.{i}.linear_attn.out_proj"],
-        )
-    )
-
-    # MLP: down -> up
-    awq_mappings.append(
-        AWQMapping(
-            smooth_layer=f"model.language_model.layers.{i}.mlp.down_proj",
-            balance_layers=[f"model.language_model.layers.{i}.mlp.up_proj"],
-        )
-    )
-
-    # MLP: gate -> up
-    awq_mappings.append(
-        AWQMapping(
-            smooth_layer=f"model.language_model.layers.{i}.mlp.gate_proj",
-            balance_layers=[f"model.language_model.layers.{i}.mlp.up_proj"],
-        )
-    )
+ mappings=[
+    {
+        "smooth_layer": r"re:model.*layers[.](3|7|11|15|19|23|27|31)[.]input_layernorm",
+        "balance_layers": [
+            r"re:model.*self_attn.q_proj",
+            r"re:model.*self_attn.k_proj",
+            r"re:model.*self_attn.v_proj",
+        ],
+    },
+    {
+        "smooth_layer": r"re:model.*post_attention_layernorm",
+        "balance_layers": [
+            r"re:model.*mlp.gate_proj",
+            r"re:model.*mlp.up_proj",
+        ],
+    },
+],
 ```
 
 ## Apriel 1.6

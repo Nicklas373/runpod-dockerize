@@ -3,7 +3,7 @@ FROM runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404
 
 # Configure image maintainer
 LABEL maintainer="Nicklas373 <herlambangdicky5@gmail.com>"
-LABEL version="1.4.0-PROD"
+LABEL version="1.4.2-PROD"
 LABEL description="Docker container for Runpod, used for LLM Quantization with LLM Compressor (AWQ)"
 
 # Configure environment variables
@@ -37,13 +37,16 @@ WORKDIR /workspace
 RUN python3 -m pip install --upgrade pip setuptools wheel
 
 # Install specific Nvidia Nemotron packages
-RUN pip install causal-conv1d==1.6.0 mamba-ssm==2.3.0 --no-build-isolation --no-cache-dir -v
+RUN pip install causal-conv1d mamba-ssm -v
 
 # Install Python dependencies
-RUN pip install accelerate datasets huggingface-hub hf-transfer llmcompressor transformers
+RUN pip install accelerate datasets flash-linear-attention huggingface-hub hf-transfer llmcompressor transformers
 
 # Install torchvision
 RUN pip install torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cu130
+
+# Install LMEval
+RUN pip install lmeval --extra-index-url https://download.pytorch.org/whl/cu${CUDA_VERSION} --index-strategy unsafe-best-match
 
 # Debug Torch Version
 RUN python3 - <<EOF
