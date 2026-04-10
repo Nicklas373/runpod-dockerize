@@ -5,4 +5,5 @@
 - [Qwen3-8B-AWQ](https://huggingface.co/nicklas373/Qwen3-8B-AWQ) -> Perplexity: 10.217 from 9.432
 - [Qwen3-8B-VL-Abliterated-AWQ](https://huggingface.co/nicklas373/Huihui-Qwen3-VL-8B-Thinking-abliterated-AWQ) -> 8.824 from 8.824
 - [Qwen3-8B-VL-Abliterated-AWQ-8-bit](https://huggingface.co/nicklas373/Huihui-Qwen3-VL-8B-Thinking-abliterated-AWQ-8-bit) -> 8.833 from 8.824
-- [Qwen3.5-9B-AWQ](https://huggingface.co/nicklas373/Qwen3.5-9B-AWQ) -> WikiText-2 Perplexity: 7.866 from 7.588
+- [Qwen3.5-9B-AWQ](https://huggingface.co/nicklas373/Qwen3.5-9B-AWQ) -> Perplexity: 7.866 from 7.588
+- [Qwen3.5-Abliterated-9B-AWQ](https://huggingface.co/nicklas373/Huihui-Qwen3.5-9B-abliterated-AWQ) -> Perplexity: 9.176 from 8.716

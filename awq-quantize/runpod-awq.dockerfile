@@ -3,7 +3,7 @@ FROM runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404
 
 # Configure image maintainer
 LABEL maintainer="Nicklas373 <herlambangdicky5@gmail.com>"
-LABEL version="1.4.2-PROD"
+LABEL version="1.4.3-PROD"
 LABEL description="Docker container for Runpod, used for LLM Quantization with LLM Compressor (AWQ)"
 
 # Configure environment variables
@@ -72,6 +72,7 @@ COPY model_eval.py /workspace/
 COPY model_perplexity.py /workspace/
 COPY model_quantize.py /workspace/
 COPY model_upload.py /workspace/
+COPY model_visual_remapping.py / /workspace/
 
 # Expose VS Code port
 EXPOSE 8080

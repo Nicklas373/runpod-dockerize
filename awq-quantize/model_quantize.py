@@ -167,6 +167,7 @@ def run_awq_quantization(
             model_path,
             trust_remote_code=trust_remote_code,
         )
+        processor = None
 
     # Ensure pad token exists (important for batching)
     if tokenizer.pad_token is None:
@@ -316,9 +317,10 @@ def run_awq_quantization(
             "re:.*vision_tower.*",
             "re:.*vision_encoder.*",
             "re:.*multi_modal_projector.*",
-            "re:model[.]visual.*",
+            # "re:.*visual.*", # Only for qwen 3_5 multimodal [NEED TEST]
+            # "re:model[.]visual.*", # Only for qwen 3_5 multimodal
             # "re:.*patch_conv.*", # Only for apriel 1.6
-            # "re:.*linear_attn.*", # Only for qwen 3.5 multimodal
+            # "re:.*linear_attn.*", # Only for qwen 3_5 multimodal
         )
 
         # Define general mappings for Qwen 3 Family
@@ -401,10 +403,14 @@ def run_awq_quantization(
         trust_remote_code_model=trust_remote_code_model,
     )
 
-    # Step 5: Save Quantized Model & Tokenizer & Processor
+    # Step 5: Save tokenizer & Processor
     tokenizer.save_pretrained(output_dir)
-    processor.save_pretrained(output_dir)
-    # save_mtp_tensors_to_checkpoint(source_model=model_path, dest_dir=output_dir) # Only needed if the original model uses MTP offloading. Check the original model repo or Hugging Face Hub to confirm if this step is necessary.
+    
+    if is_mm_model:
+        processor.save_pretrained(output_dir)
+
+    # Only needed if the original model uses MTP offloading. Check the original model repo or Hugging Face Hub to confirm if this step is necessary.
+    # save_mtp_tensors_to_checkpoint(source_model=model_path, dest_dir=output_dir) 
 
     print(f"Success! Quantized model saved to {output_dir}")
 

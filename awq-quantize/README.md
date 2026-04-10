@@ -89,6 +89,7 @@ python3 model_upload.py --hf_token XXXX --repo_id YOUR_REPO_NAME --local_dir YOU
 - /workspace/model_perplexity.py: Python based calculate perplexity score
 - /workspace/model_quantize.py: Python based quantization script
 - /workspace/model_upload.py: Python based upload to HF script
+- /workspace/model_visual_remapping.py: Python based to re-mapping structure for visual block on some hybrid models
 
 ## Python package requirements
 
