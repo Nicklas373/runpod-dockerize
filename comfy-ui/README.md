@@ -10,9 +10,11 @@ First start installs will initialize several extensions (takes a few minutes), t
 FETCH DATA from: https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main/custom-node-list.json⁠ [DONE]
 
 [ComfyUI-Manager] All startup tasks have been completed.
+
+[INFO] To see the GUI go to: http://0.0.0.0:8083
 ```
 
-Comfy UI 0.17.1
+Comfy UI 0.22.0
 
 ## Access
 
@@ -27,6 +29,7 @@ Comfy UI 0.17.1
 ## Pre-installed custom nodes
 
 - [ComfyUI-WanVideoWrapper](https://github.com/kijai/ComfyUI-WanVideoWrapper)
+- [ComfyUI-Manager](https://github.com/Comfy-Org/ComfyUI-Manager)
 - [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF)
 - [ComfyUI-Custom-Scripts](https://github.com/pythongosssss/ComfyUI-Custom-Scripts)
 - [ComfyUI_LayerStyle](https://github.com/chflame163/ComfyUI_LayerStyle)
@@ -37,9 +40,7 @@ Comfy UI 0.17.1
 - [efficiency-nodes-comfyui](https://github.com/jags111/efficiency-nodes-comfyui)
 - [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
 - [ComfyUI_UltimateSDUpscale](https://github.com/ssitu/ComfyUI_UltimateSDUpscale)
-- [ComfyUI-segment-anything-2](https://github.com/kijai/ComfyUI-segment-anything-2)
 - [comfyui-inpaint-nodes](https://github.com/Acly/comfyui-inpaint-nodes)
-- [ComfyUI-TeaCache](https://github.com/welltop-cn/ComfyUI-TeaCache)
 - [ComfyUI_essentials](https://github.com/cubiq/ComfyUI_essentials)
 - [ComfyUI-Advanced-ControlNet](https://github.com/Kosinkadink/ComfyUI-Advanced-ControlNet)
 - [ComfyUI-Frame-Interpolation](https://github.com/Fannovel16/ComfyUI-Frame-Interpolation)
@@ -76,6 +77,12 @@ Comfy UI 0.17.1
 - [ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack)
 - [ComfyUI-SeedVR2_VideoUpscaler](https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler)
 - [was-node-suite-comfyui](https://github.com/WASasquatch/was-node-suite-comfyui)
+- [ComfyUI-HunyuanVideo-Foley](https://github.com/phazei/ComfyUI-HunyuanVideo-Foley)
+- [ComfyUI_Comfyroll_CustomNodes](https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes)
+- [ComfyUI-RMBG](https://github.com/1038lab/ComfyUI-RMBG)
+- [comfy-image-saver](https://github.com/giriss/comfy-image-saver)
+- [comfyui-WhiteRabbit](https://github.com/Artificial-Sweetener/comfyui-WhiteRabbit)
+- [ComfyUI-SAM3](https://github.com/PozzettiAndrea/ComfyUI-SAM3)
 
 ## SageAttention Custom Install (For NVIDIA Blackwell Architecture)
 
@@ -87,6 +94,10 @@ Comfy UI 0.17.1
 
 ## What's New
 
+- 1.1.2 (2026-05-27)
+  - Add more additional custom nodes
+  - ComfyUI Version [0.22.0](https://github.com/Comfy-Org/ComfyUI/commit/f9f54cae428337ae9d9342b14141d77e1fb53ef0)
+  - Replace workflow “Reasoning Loops v1_0.json” with "Wan2.2 Reasoning Loops v1_1.json" from [@LumiNami](https://civitai.com/user/LumiNami)
 - 1.1.0 (2026-03-14)
   - Add blank “SEEDVR2” folder in /models
   - Add was-node-suite in /custom-nodes

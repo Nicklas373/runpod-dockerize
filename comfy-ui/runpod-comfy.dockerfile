@@ -3,7 +3,7 @@ FROM runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404
 
 # Configure image maintainer
 LABEL maintainer="Nicklas373 <herlambangdicky5@gmail.com>"
-LABEL version="1.1.0-PROD"
+LABEL version="1.1.2-PROD"
 LABEL description="Docker container for Runpod, used for Comfy UI"
 
 # Configure environment variables
@@ -81,9 +81,7 @@ RUN cd /workspace/ComfyUI/custom_nodes && \
     git clone https://github.com/jags111/efficiency-nodes-comfyui && \
     git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite && \
     git clone https://github.com/ssitu/ComfyUI_UltimateSDUpscale && \
-    git clone https://github.com/kijai/ComfyUI-segment-anything-2 && \
     git clone https://github.com/Acly/comfyui-inpaint-nodes && \
-    git clone https://github.com/welltop-cn/ComfyUI-TeaCache && \
     git clone https://github.com/cubiq/ComfyUI_essentials && \
     git clone https://github.com/Kosinkadink/ComfyUI-Advanced-ControlNet && \
     git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation && \
@@ -120,6 +118,12 @@ RUN cd /workspace/ComfyUI/custom_nodes && \
     git clone https://github.com/ltdrdata/ComfyUI-Impact-Pack && \
     git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler && \
     git clone https://github.com/WASasquatch/was-node-suite-comfyui && \
+    git clone https://github.com/phazei/ComfyUI-HunyuanVideo-Foley && \
+    git clone https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes && \
+    git clone https://github.com/1038lab/ComfyUI-RMBG && \
+    git clone https://github.com/giriss/comfy-image-saver && \
+    git clone https://github.com/Artificial-Sweetener/comfyui-WhiteRabbit && \
+    git clone https://github.com/PozzettiAndrea/ComfyUI-SAM3 && \
     for d in */; do \
         if [ -f "$d/requirements.txt" ]; then \
             uv pip install -r "$d/requirements.txt"; \
@@ -134,7 +138,7 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh
 
 # Copy sage attention and workflow to workspace
 COPY init-sageattention.sh /workspace/
-COPY Reasoning_Loops_v1_0.json /workspace/
+COPY Wan2_2_Reasoning_Loops_v1_1.json /workspace/
 
 # Create blank folder for SEEDVR2
 RUN mkdir /workspace/ComfyUI/models/SEEDVR2
