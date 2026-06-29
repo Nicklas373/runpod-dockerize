@@ -1,9 +1,9 @@
-# Use runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404 as base image
-FROM runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404
+# Use runpod/pytorch:1.0.7-cu1300-torch291-ubuntu2404 as base image
+FROM runpod/pytorch:1.0.7-cu1300-torch291-ubuntu2404
 
 # Configure image maintainer
 LABEL maintainer="Nicklas373 <herlambangdicky5@gmail.com>"
-LABEL version="1.1.2-PROD"
+LABEL version="1.2.0-PROD"
 LABEL description="Docker container for Runpod, used for Comfy UI"
 
 # Configure environment variables
@@ -54,8 +54,7 @@ RUN uv pip install -r /workspace/ComfyUI/requirements.txt
 RUN uv pip install -r /workspace/ComfyUI/manager_requirements.txt
 RUN uv pip install -r /workspace/requirements.txt
 
-# Re-configure pytorch before init sage attention
-RUN uv pip uninstall torch torchvision torchaudio
+# Install torch
 RUN uv pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu130
 
 # Install sage attention 2
@@ -124,17 +123,23 @@ RUN cd /workspace/ComfyUI/custom_nodes && \
     git clone https://github.com/giriss/comfy-image-saver && \
     git clone https://github.com/Artificial-Sweetener/comfyui-WhiteRabbit && \
     git clone https://github.com/PozzettiAndrea/ComfyUI-SAM3 && \
+    git clone https://github.com/Comfy-Org/Nvidia_RTX_Nodes_ComfyUI && \
+    git clone https://github.com/darksidewalker/ComfyUI-DaSiWa-Nodes && \
     for d in */; do \
         if [ -f "$d/requirements.txt" ]; then \
-            uv pip install -r "$d/requirements.txt"; \
+            echo "Installing requirements for $d"; \
+            uv pip install -r "$d/requirements.txt" || echo "⚠️ Failed requirements for $d (continuing)"; \
         fi; \
-    done
+    done 
 
 # Manage another requirement
 RUN uv pip uninstall pynvml && uv pip install compel nvidia-ml-py
 
 # Install code-server
 RUN curl -fsSL https://code-server.dev/install.sh | sh
+
+# Manage exclusive SAM3 dependencies
+RUN cd /workspace/ComfyUI/custom_nodes/ComfyUI-SAM3 && comfy-env install
 
 # Copy sage attention and workflow to workspace
 COPY init-sageattention.sh /workspace/

@@ -14,7 +14,7 @@ FETCH DATA from: https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main
 [INFO] To see the GUI go to: http://0.0.0.0:8083
 ```
 
-Comfy UI 0.22.0
+Comfy UI 0.26.0
 
 ## Access
 
@@ -83,6 +83,8 @@ Comfy UI 0.22.0
 - [comfy-image-saver](https://github.com/giriss/comfy-image-saver)
 - [comfyui-WhiteRabbit](https://github.com/Artificial-Sweetener/comfyui-WhiteRabbit)
 - [ComfyUI-SAM3](https://github.com/PozzettiAndrea/ComfyUI-SAM3)
+- [Nvidia_RTX_Nodes_ComfyUI](https://github.com/Comfy-Org/Nvidia_RTX_Nodes_ComfyUI)
+- [ComfyUI-DaSiWa-Nodes](https://github.com/darksidewalker/ComfyUI-DaSiWa-Nodes)
 
 ## SageAttention Custom Install (For NVIDIA Blackwell Architecture)
 
@@ -94,6 +96,11 @@ Comfy UI 0.22.0
 
 ## What's New
 
+- 1.2.0 (2026-06-26)
+  - Add 2 new custom nodes as request [Nvidia_RTX_Nodes_ComfyUI](https://github.com/Comfy-Org/Nvidia_RTX_Nodes_ComfyUI) & [ComfyUI-DaSiWa-Nodes](https://github.com/darksidewalker/ComfyUI-DaSiWa-Nodes) from [@LumiNami](https://civitai.com/user/LumiNami)
+  - ComfyUI Version [0.26.0](https://github.com/Comfy-Org/ComfyUI/commit/7cb784e0f48784bb6ed588912e186e5ee1e9ee68)
+  - Fix sam3 custom node dependencies
+  - Update Pytorch container to version 2.9.1 with cuda 13.0 (runpod/pytorch:1.0.7-cu1300-torch291-ubuntu2404)
 - 1.1.2 (2026-05-27)
   - Add more additional custom nodes
   - ComfyUI Version [0.22.0](https://github.com/Comfy-Org/ComfyUI/commit/f9f54cae428337ae9d9342b14141d77e1fb53ef0)
