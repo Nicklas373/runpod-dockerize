@@ -11,16 +11,31 @@ from transformers import (
 
 # Check if the model is multimodal
 def is_multimodal_model(model_id: str) -> bool:
-    keywords = keywords = [
-        "apriel",
-        "mistral",
-        "ministral",
-        "ministral3",
-        "kimivl",
-        "qwen3-vl",
-        "qwen3.5"
-    ] # Add more keywords as needed
-    return any(k in model_id.lower() for k in keywords)
+    """
+    Detect whether a model should be loaded with
+    AutoModelForImageTextToText.
+
+    This is more reliable than checking model names.
+    """
+
+    config = AutoConfig.from_pretrained(
+        model_id,
+        trust_remote_code=True,
+    )
+
+    architectures = config.architectures or []
+
+    multimodal_keywords = (
+        "ConditionalGeneration",
+        "ImageTextToText",
+        "Vision",
+        "VL",
+    )
+
+    return any(
+        any(keyword in arch for keyword in multimodal_keywords)
+        for arch in architectures
+    )
 
 # Model evaluation function
 def model_eval(
@@ -70,25 +85,78 @@ def model_eval(
     prompt = "Explain what a neural network is in simple terms."
 
     if is_mm_model:
-        inputs = processor(
-            text=prompt,
-            return_tensors="pt"
-        ).to(model.device)
-    else:
-        inputs = tokenizer(
-            prompt,
-            return_tensors="pt"
-        ).to(model.device)
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt,
+                    }
+                ],
+            }
+        ]
 
-    inputs = {k: v.to(model.device) for k, v in inputs.items()}
-
-    with torch.no_grad():
-        out = model.generate(
-            **inputs,
-            max_new_tokens=50,
+        inputs = processor.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=True,
+            return_dict=True,
+            return_tensors="pt",
         )
 
-    return print(tokenizer.decode(out[0], skip_special_tokens=True))
+        inputs = {
+            k: v.to(model.device)
+            for k, v in inputs.items()
+        }
+
+    else:
+        messages = [
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        ]
+
+        formatted_prompt = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+
+        inputs = tokenizer(
+            formatted_prompt,
+            return_tensors="pt",
+        )
+
+        inputs = {
+            k: v.to(model.device)
+            for k, v in inputs.items()
+        }
+
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=128,
+            do_sample=False,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+
+    prompt_length = inputs["input_ids"].shape[1]
+    generated_tokens = outputs[:, prompt_length:]
+
+    if is_mm_model:
+        response = processor.batch_decode(
+            generated_tokens,
+            skip_special_tokens=True,
+        )[0]
+    else:
+        response = tokenizer.decode(
+            generated_tokens[0],
+            skip_special_tokens=True,
+        )
+
+    return print(response)
 
 # Main function to parse arguments and run the test
 def main():

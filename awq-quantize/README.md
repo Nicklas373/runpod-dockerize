@@ -5,27 +5,27 @@ Quantize any LLM Models into AWQ 4 Bit format by using LLM Compressor package fr
 ## Current Recipe
 
 ```shell
-SmoothQuantModifier(
-    smoothing_strength=0.6,
-),
-AWQModifier(
-    targets=["Linear"],
-    ignore=ignore_modules,
-    config_groups={
-        "main": {
-            "targets": ["Linear"],
-            "weights": {
-                "num_bits": 4,
-                "type": "int",
-                "symmetric": True,
-                "strategy": "group",
-                "group_size": 32,
-                "observer": "mse",
-                "dynamic": False,
-            },
-        }
-    },
-)
+recipe = [
+    AWQModifier(),
+    QuantizationModifier(
+        targets=["Linear"],
+        ignore=ignore_modules,
+        config_groups={
+            "main": {
+                "targets": ["Linear"],
+                "weights": {
+                    "num_bits": 4,
+                    "type": "int",
+                    "symmetric": True,
+                    "strategy": "group",
+                    "group_size": 32,
+                    "observer": "mse",
+                    "dynamic": False,
+                },
+            }
+        },
+    )
+]
 ```
 
 ## Recommendation Content
@@ -100,7 +100,4 @@ python3 model_upload.py --hf_token XXXX --repo_id YOUR_REPO_NAME --local_dir YOU
 - huggingface-hub
 - hf-transfer
 - llmcompressor
-- lm_eval
-- mamba-ssm
 - transformers
-- vllm

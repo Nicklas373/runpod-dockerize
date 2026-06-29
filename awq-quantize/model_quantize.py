@@ -8,17 +8,16 @@ from datasets import load_dataset, Dataset
 from huggingface_hub import snapshot_download
 from io import BytesIO
 from llmcompressor import oneshot
-from llmcompressor.modifiers.awq import AWQModifier, AWQMapping
-from llmcompressor.modifiers.transform.smoothquant import SmoothQuantModifier
+from llmcompressor.modifiers.transform.awq import AWQModifier, AWQMapping
+from llmcompressor.modifiers.quantization import QuantizationModifier
 from pathlib import Path
 from PIL import Image
 import requests
 import torch
 from transformers import (
-    # Qwen3_5ForCausalLM, // Use only for Qwen3.5 base models without vision
-    # Qwen3_5ForConditionalGeneration, // Use only for Qwen3.5 multimodal models
-    AutoModelForCausalLM, # Use for general causal language models (e.g. Qwen3.5 base)
-    AutoModelForImageTextToText, # Use for general multimodal models (e.g. Qwen3.5 multimodal)
+    AutoModelForCausalLM,
+    AutoModelForImageTextToText,
+    AutoConfig,
     AutoTokenizer,
     AutoProcessor,
 )
@@ -26,17 +25,36 @@ from transformers import (
 # --------------------------------------------------
 # Multimodal Model Variables & Functions
 # --------------------------------------------------
+# --------------------------------------------------
+# Detect multimodal model
+# --------------------------------------------------
 def is_multimodal_model(model_id: str) -> bool:
-    keywords = [
-        "apriel",
-        "mistral",
-        "ministral",
-        "ministral3",
-        "kimivl",
-        "qwen3-vl",
-        "qwen3.5"
-    ] # Add more keywords as needed
-    return any(k in model_id.lower() for k in keywords)
+    """
+    Detect whether a model should be loaded with
+    AutoModelForImageTextToText.
+
+    This is more reliable than checking model names.
+    """
+
+    config = AutoConfig.from_pretrained(
+        model_id,
+        trust_remote_code=True,
+    )
+
+    architectures = config.architectures or []
+
+    multimodal_keywords = (
+        "ConditionalGeneration",
+        "ImageTextToText",
+        "Vision",
+        "VL",
+    )
+
+    return any(
+        any(keyword in arch for keyword in multimodal_keywords)
+        for arch in architectures
+    )
+
 
 def detect_image_column(dataset):
     for col in dataset.column_names:
@@ -123,6 +141,7 @@ def run_awq_quantization(
         text_column: str,
         trust_remote_code: bool,
         trust_remote_code_model: bool,
+        quantization_type: str = "awq"
 ):
     # Step 1: Download/Verify local model
     model_path = get_model_path(branch, False, hf_cache, model_id)
@@ -188,14 +207,21 @@ def run_awq_quantization(
         dataset_config.split(",") if dataset_config else [None] * len(dataset_ids)
     )
 
+    dataset_splits = (
+        dataset_split.split(",")
+        if dataset_split
+        else ["train"] * len(dataset_ids)
+    )
+
     assert len(dataset_configs) == len(dataset_ids)
+    assert len(dataset_splits) == len(dataset_ids)
 
     if dataset_mix:
         ratios = [float(x) for x in dataset_mix.split(",")]
     else:
         ratios = [1 / len(dataset_ids)] * len(dataset_ids)
 
-    for dataset_id, dataset_config, ratio in zip(dataset_ids, dataset_configs, ratios):
+    for dataset_id, dataset_config, split_name, ratio in zip(dataset_ids, dataset_configs, dataset_splits, ratios):
         sample_count = max(1, int(num_samples * ratio))
         print(f"Loading dataset: {dataset_id} (ratio={ratio}, samples={sample_count})")
 
@@ -204,7 +230,7 @@ def run_awq_quantization(
             ds = load_dataset(
                 dataset_id,
                 dataset_config,
-                split=dataset_split,
+                split=split_name,
                 streaming=True
             )
             ds = Dataset.from_list(list(ds.take(sample_count)))
@@ -213,12 +239,12 @@ def run_awq_quantization(
                 ds = load_dataset(
                     dataset_id,
                     dataset_config,
-                    split=f"{dataset_split}[:{sample_count}]"
+                    split=f"{split_name}[:{sample_count}]"
                 )
             else:
                 ds = load_dataset(
                     dataset_id,
-                    split=f"{dataset_split}[:{sample_count}]"
+                    split=f"{split_name}[:{sample_count}]"
                 )
 
         # Detect multimodal dataset
@@ -246,7 +272,6 @@ def run_awq_quantization(
                     if not content:
                         continue
 
-                    # handle list captions safely
                     if isinstance(content, list):
                         text = " ".join(str(x) for x in content)
                     else:
@@ -255,14 +280,13 @@ def run_awq_quantization(
                     tokens = tokenizer(
                         text,
                         truncation=True,
-                        padding="max_length",
+                        padding=False,
                         max_length=max_seq_length,
-                        return_tensors="pt",
                     )
 
                     all_samples.append({
-                        "input_ids": tokens["input_ids"][0],
-                        "attention_mask": tokens["attention_mask"][0],
+                        "input_ids": tokens["input_ids"],
+                        "attention_mask": tokens["attention_mask"],
                     })
 
                 except Exception as e:
@@ -282,20 +306,23 @@ def run_awq_quantization(
                         add_generation_prompt=False,
                     )
 
+                    add_special_tokens = False
+
                 else:
                     text = str(content)
+                    add_special_tokens = True
 
                 tokens = tokenizer(
                     text,
                     truncation=True,
-                    padding="max_length",
+                    padding=False,
                     max_length=max_seq_length,
-                    return_tensors="pt",
+                    add_special_tokens=add_special_tokens,
                 )
 
                 all_samples.append({
-                    "input_ids": tokens["input_ids"][0],
-                    "attention_mask": tokens["attention_mask"][0],
+                    "input_ids": tokens["input_ids"],
+                    "attention_mask": tokens["attention_mask"],
                 })
 
     # Final calibration dataset
@@ -303,88 +330,123 @@ def run_awq_quantization(
 
     # Step 3: Define Recipe (Standard 4-bit AWQ)
     ignore_modules = (
-            "re:.*model.embed_tokens",
-            "re:.*model.norm",
+            #"re:.*model.embed_tokens",
+            #"re:.*model.norm",
             "re:.*lm_head",
             # "re:.*embed_tokens", # Only for qwen 3_5
             # "re:.*lm_head", # Only for qwen 3_5
             # "re:mtp.*", # Only for qwen 3_5
+            #"re:.*embed_tokens.*",
+            #"re:.*lm_head.*",
+            #"re:.*norm.*",
         )
 
     # Define specific ignored modules, mappings and recipe for multimodal model
     if is_mm_model:
         ignore_modules += (
-            "re:.*vision_tower.*",
+            # "re:.*vision_embedder.*", # gemma4
+            # "re:.*embed_vision.*", # gemma4
+            # "re:.*audio_tower.*", # gemma4
+            # "re:.*embed_audio.*", # gemma4
+            # "re:.*vision_tower.*",  # apriel / mistral / ministral
             "re:.*vision_encoder.*",
             "re:.*multi_modal_projector.*",
-            # "re:.*visual.*", # Only for qwen 3_5 multimodal [NEED TEST]
-            # "re:model[.]visual.*", # Only for qwen 3_5 multimodal
-            # "re:.*patch_conv.*", # Only for apriel 1.6
-            # "re:.*linear_attn.*", # Only for qwen 3_5 multimodal
+            # "re:.*visual.*", # qwen3-vl / qwen3.5 multimodal [NEEDS TEST]
+            # "re:model[.]visual.*", # qwen3.5 multimodal
+            # "re:.*patch_conv.*", # apriel 1.6
+            # "re:.*linear_attn.*", # qwen3.5 multimodal
         )
 
-        # Define general mappings for Qwen 3 Family
-        awq_mappings = [
-            AWQMapping(
-                smooth_layer="re:model.language_model.layers.*.input_layernorm",
-                balance_layers=[
-                    "re:model.language_model.layers.*.q_proj",
-                    "re:model.language_model.layers.*.k_proj",
-                    "re:model.language_model.layers.*.v_proj",
-                ],
-            ),
-            AWQMapping(
-                smooth_layer="re:model.language_model.layers.*.post_attention_layernorm",
-                balance_layers=[
-                    "re:model.language_model.layers.*.gate_proj",
-                    "re:model.language_model.layers.*.up_proj",
-                ],
-            ),
-        ]
+    # Define general mappings for Qwen 3 Family
+    awq_mappings = [
+        AWQMapping(
+            smooth_layer="re:model.language_model.layers.*.input_layernorm",
+            balance_layers=[
+                "re:model.language_model.layers.*.q_proj",
+                "re:model.language_model.layers.*.k_proj",
+                "re:model.language_model.layers.*.v_proj",
+            ],
+        ),
+        AWQMapping(
+            smooth_layer="re:model.language_model.layers.*.post_attention_layernorm",
+            balance_layers=[
+                "re:model.language_model.layers.*.gate_proj",
+                "re:model.language_model.layers.*.up_proj",
+            ],
+        ),
+    ]
 
-        recipe = [
-            AWQModifier(
-                targets=["Linear"],
-                ignore=ignore_modules,
-                mappings=awq_mappings,
-                config_groups={
-                    "main": {
-                        "targets": ["Linear"],
-                        "weights": {
-                            "num_bits": 4,
-                            "type": "int",
-                            "symmetric": True,
-                            "strategy": "group",
-                            "group_size": 32, 
-                            "observer": "mse",
-                            "dynamic": False,
-                        },
-                    }
-                },
-            )
-        ]
-    else:
-        recipe = [
-            AWQModifier(
-                targets=["Linear"],
-                ignore=ignore_modules,
-                config_groups={
-                    "main": {
-                        "targets": ["Linear"],
-                        "weights": {
-                            "num_bits": 4,
-                            "type": "int",
-                            "symmetric": True,
-                            "strategy": "group",
-                            "group_size": 32,
-                            "observer": "mse",
-                            "dynamic": False,
-                        },
-                    }
-                },
-            )
-        ]
+    # Define general mappings for Gemma 4 Family
+    # awq_mappings = []
+    # mods = dict(model.named_modules())
+    # num_layers = len(model.model.language_model.layers)
 
+    # for i in range(num_layers):
+    #     prefix = f"model.language_model.layers.{i}"
+
+    #     q = f"{prefix}.self_attn.q_proj"
+    #     k = f"{prefix}.self_attn.k_proj"
+    #     v = f"{prefix}.self_attn.v_proj"
+    #     o = f"{prefix}.self_attn.o_proj"
+
+    #     if all(x in mods for x in [q, k, v]):
+    #         awq_mappings.append(
+    #             AWQMapping(
+    #                 smooth_layer=f"{prefix}.input_layernorm",
+    #                 balance_layers=[q, k, v],
+    #             )
+    #         )
+
+    #         if o in mods:
+    #             awq_mappings.append(
+    #                 AWQMapping(
+    #                     smooth_layer=v,
+    #                     balance_layers=[o],
+    #                 )
+    #             )
+
+    #     gate = f"{prefix}.mlp.gate_proj"
+    #     up = f"{prefix}.mlp.up_proj"
+    #     down = f"{prefix}.mlp.down_proj"
+
+    #     if all(x in mods for x in [gate, up]):
+    #         awq_mappings.append(
+    #             AWQMapping(
+    #                 smooth_layer=f"{prefix}.pre_feedforward_layernorm",
+    #                 balance_layers=[gate, up],
+    #             )
+    #         )
+
+    #     if up in mods and down in mods:
+    #         awq_mappings.append(
+    #             AWQMapping(
+    #                 smooth_layer=up,
+    #                 balance_layers=[down],
+    #             )
+    #         )
+    
+    recipe = [
+        AWQModifier(mappings=awq_mappings),
+        QuantizationModifier(
+            targets=["Linear"],
+            ignore=ignore_modules,
+            config_groups={
+                "main": {
+                    "targets": ["Linear"],
+                    "weights": {
+                        "num_bits": 4,
+                        "type": "int",
+                        "symmetric": True,
+                        "strategy": "group",
+                        "group_size": 32, 
+                        "observer": "mse",
+                        "dynamic": False,
+                    },
+                }
+            },
+        )
+    ]
+    
     # Step 4: Run Oneshot Quantization
     output_dir = f"{model_path.name}-AWQ"
 
@@ -394,7 +456,7 @@ def run_awq_quantization(
     torch.set_float32_matmul_precision("high")
 
     oneshot(
-        model=model, # Pass the local directory string
+        model=model,
         dataset=calibration_dataset,
         recipe=recipe,
         num_calibration_samples=(len(calibration_dataset) if calibration_dataset else None),

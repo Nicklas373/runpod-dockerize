@@ -1,9 +1,9 @@
-# Use runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404 as base image
-FROM runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404
+# Use runpod/pytorch:1.0.7-cu1300-torch291-ubuntu2404 as base image
+FROM runpod/pytorch:1.0.7-cu1300-torch291-ubuntu2404
 
 # Configure image maintainer
 LABEL maintainer="Nicklas373 <herlambangdicky5@gmail.com>"
-LABEL version="1.4.3-PROD"
+LABEL version="1.4.4-PROD"
 LABEL description="Docker container for Runpod, used for LLM Quantization with LLM Compressor (AWQ)"
 
 # Configure environment variables
@@ -34,34 +34,21 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh
 WORKDIR /workspace
 
 # Install and upgrade pip, setuptools, and wheel
-RUN python3 -m pip install --upgrade pip setuptools wheel
-
-# Install specific Nvidia Nemotron packages
-RUN pip install causal-conv1d mamba-ssm -v
+RUN python3 -m pip install --upgrade pip setuptools wheel numpy
 
 # Install Python dependencies
-RUN pip install accelerate datasets flash-linear-attention huggingface-hub hf-transfer llmcompressor transformers
+RUN pip install accelerate datasets flash-linear-attention causal-conv1d huggingface-hub hf-transfer llmcompressor
 
-# Install torchvision
-RUN pip install torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cu130
+# Re-structure compressed-tensors !
+RUN pip uninstall compressed-tensors
+RUN pip install git+https://github.com/vllm-project/compressed-tensors 
 
-# Install LMEval
-RUN pip install lmeval --extra-index-url https://download.pytorch.org/whl/cu${CUDA_VERSION} --index-strategy unsafe-best-match
+# Re-structure torch !
+RUN pip uninstall torch torchvision torchaudio
+RUN pip install torch==2.12.1 torchvision==0.27.1 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cu130
 
-# Debug Torch Version
-RUN python3 - <<EOF
-import torch
-print("Torch version:", torch.__version__)
-EOF
-
-# Debug Mamba SSM Version
-RUN python3 - <<EOF
-import mamba_ssm
-from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
-print("Mamba SSM version:", mamba_ssm.__version__)
-print("Selective Scan Function:", selective_scan_fn)
-print("mamba CUDA OK")
-EOF
+# Install latest transformers
+RUN pip install --upgrade transformers
 
 # Create Offload Folder
 RUN mkdir /workspace/offload_model
@@ -72,7 +59,7 @@ COPY model_eval.py /workspace/
 COPY model_perplexity.py /workspace/
 COPY model_quantize.py /workspace/
 COPY model_upload.py /workspace/
-COPY model_visual_remapping.py / /workspace/
+COPY model_visual_remapping.py /workspace/
 
 # Expose VS Code port
 EXPOSE 8080
