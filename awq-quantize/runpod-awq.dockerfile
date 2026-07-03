@@ -3,7 +3,7 @@ FROM runpod/pytorch:1.0.7-cu1300-torch291-ubuntu2404
 
 # Configure image maintainer
 LABEL maintainer="Nicklas373 <herlambangdicky5@gmail.com>"
-LABEL version="1.4.4-PROD"
+LABEL version="1.4.6-PROD"
 LABEL description="Docker container for Runpod, used for LLM Quantization with LLM Compressor (AWQ)"
 
 # Configure environment variables
@@ -40,12 +40,12 @@ RUN python3 -m pip install --upgrade pip setuptools wheel numpy
 RUN pip install accelerate datasets flash-linear-attention causal-conv1d huggingface-hub hf-transfer llmcompressor
 
 # Re-structure compressed-tensors !
-RUN pip uninstall compressed-tensors
+RUN pip uninstall compressed-tensors -y
 RUN pip install git+https://github.com/vllm-project/compressed-tensors 
 
 # Re-structure torch !
-RUN pip uninstall torch torchvision torchaudio
-RUN pip install torch==2.12.1 torchvision==0.27.1 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cu130
+RUN pip uninstall torch torchvision torchaudio -y
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
 
 # Install latest transformers
 RUN pip install --upgrade transformers
