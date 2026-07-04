@@ -72,6 +72,12 @@ python model_quantize.py --model_id "HUGGINGFACE/HUGGINGFACE_MODEL" --dataset_id
 python model_eval.py --model_id "QUANTIZED_LOCAL_DIR" --trust_remote_code True
 ```
 
+- If needed model.safetensors.index.json , run **model_generate_safetensors.py**
+
+```shell
+python model_generate_safetensors.py --model_dir "QUANTIZED_LOCAL_DIR"
+```
+
 - To upload on HF as repo model, run **model_upload.py**
 
 ```shell
@@ -89,6 +95,7 @@ python3 model_upload.py --hf_token XXXX --repo_id YOUR_REPO_NAME --local_dir YOU
 - /workspace/model_perplexity.py: Python based calculate perplexity score
 - /workspace/model_quantize.py: Python based quantization script
 - /workspace/model_upload.py: Python based upload to HF script
+- /workspace/model_generate_safetensors.py: Python based generate model.safetensors.index.json
 - /workspace/model_visual_remapping.py: Python based to re-mapping structure for visual block on some hybrid models
 
 ## Python package requirements

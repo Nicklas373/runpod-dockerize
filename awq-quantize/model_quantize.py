@@ -141,7 +141,6 @@ def run_awq_quantization(
         text_column: str,
         trust_remote_code: bool,
         trust_remote_code_model: bool,
-        quantization_type: str = "awq"
 ):
     # Step 1: Download/Verify local model
     model_path = get_model_path(branch, False, hf_cache, model_id)
@@ -152,24 +151,21 @@ def run_awq_quantization(
 
     # Step 2: Manually load the model with the trust flag
     print(f"Loading model from {model_path}...")
-    if is_mm_model:
-        with load_offloaded_model():
-            model = AutoModelForImageTextToText.from_pretrained(
-                model_path,
-                trust_remote_code=trust_remote_code,
-                dtype="auto",
-                device_map="auto",
-                offload_folder="./offload_model",
-            )
-    else:
-        with load_offloaded_model():
-            model = AutoModelForCausalLM.from_pretrained(
-                model_path,
-                trust_remote_code=trust_remote_code,
-                dtype="auto",
-                device_map="auto",
-                offload_folder="./offload_model",
-            )
+
+    ModelClass = (
+        AutoModelForImageTextToText
+        if is_mm_model
+        else AutoModelForCausalLM
+    )
+
+    with load_offloaded_model():
+        model = ModelClass.from_pretrained(
+            model_id,
+            trust_remote_code=True,
+            torch_dtype="auto",
+            device_map="auto",
+            offload_folder="./offload_model",
+        )
 
     # Prepare tokenizer
     if is_mm_model:
@@ -330,34 +326,19 @@ def run_awq_quantization(
 
     # Step 3: Define Recipe (Standard 4-bit AWQ)
     ignore_modules = (
-            #"re:.*model.embed_tokens",
-            #"re:.*model.norm",
-            "re:.*lm_head",
-            # "re:.*embed_tokens", # Only for qwen 3_5
-            # "re:.*lm_head", # Only for qwen 3_5
-            # "re:mtp.*", # Only for qwen 3_5
-            #"re:.*embed_tokens.*",
-            #"re:.*lm_head.*",
-            #"re:.*norm.*",
-        )
+        "re:.*model.embed_tokens",
+        "re:.*model.norm",
+        "re:.*lm_head",
+    )
 
     # Define specific ignored modules, mappings and recipe for multimodal model
     if is_mm_model:
         ignore_modules += (
-            # "re:.*vision_embedder.*", # gemma4
-            # "re:.*embed_vision.*", # gemma4
-            # "re:.*audio_tower.*", # gemma4
-            # "re:.*embed_audio.*", # gemma4
-            # "re:.*vision_tower.*",  # apriel / mistral / ministral
             "re:.*vision_encoder.*",
             "re:.*multi_modal_projector.*",
-            # "re:.*visual.*", # qwen3-vl / qwen3.5 multimodal [NEEDS TEST]
-            # "re:model[.]visual.*", # qwen3.5 multimodal
-            # "re:.*patch_conv.*", # apriel 1.6
-            # "re:.*linear_attn.*", # qwen3.5 multimodal
+            "re:.*vision_tower.*",
         )
 
-    # Define general mappings for Qwen 3 Family
     awq_mappings = [
         AWQMapping(
             smooth_layer="re:model.language_model.layers.*.input_layernorm",
@@ -375,55 +356,6 @@ def run_awq_quantization(
             ],
         ),
     ]
-
-    # Define general mappings for Gemma 4 Family
-    # awq_mappings = []
-    # mods = dict(model.named_modules())
-    # num_layers = len(model.model.language_model.layers)
-
-    # for i in range(num_layers):
-    #     prefix = f"model.language_model.layers.{i}"
-
-    #     q = f"{prefix}.self_attn.q_proj"
-    #     k = f"{prefix}.self_attn.k_proj"
-    #     v = f"{prefix}.self_attn.v_proj"
-    #     o = f"{prefix}.self_attn.o_proj"
-
-    #     if all(x in mods for x in [q, k, v]):
-    #         awq_mappings.append(
-    #             AWQMapping(
-    #                 smooth_layer=f"{prefix}.input_layernorm",
-    #                 balance_layers=[q, k, v],
-    #             )
-    #         )
-
-    #         if o in mods:
-    #             awq_mappings.append(
-    #                 AWQMapping(
-    #                     smooth_layer=v,
-    #                     balance_layers=[o],
-    #                 )
-    #             )
-
-    #     gate = f"{prefix}.mlp.gate_proj"
-    #     up = f"{prefix}.mlp.up_proj"
-    #     down = f"{prefix}.mlp.down_proj"
-
-    #     if all(x in mods for x in [gate, up]):
-    #         awq_mappings.append(
-    #             AWQMapping(
-    #                 smooth_layer=f"{prefix}.pre_feedforward_layernorm",
-    #                 balance_layers=[gate, up],
-    #             )
-    #         )
-
-    #     if up in mods and down in mods:
-    #         awq_mappings.append(
-    #             AWQMapping(
-    #                 smooth_layer=up,
-    #                 balance_layers=[down],
-    #             )
-    #         )
     
     recipe = [
         AWQModifier(mappings=awq_mappings),

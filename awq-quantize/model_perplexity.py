@@ -1,78 +1,101 @@
 import argparse
-import math
 import torch
-from compressed_tensors.offload import load_offloaded_model
+import math
 from datasets import load_dataset
+from tqdm import tqdm
+from compressed_tensors.offload import load_offloaded_model
 from transformers import (
+    AutoConfig,
     AutoModelForCausalLM,
     AutoModelForImageTextToText,
     AutoTokenizer,
+    AutoProcessor,
 )
-from tqdm import tqdm
 
+torch.backends.cuda.matmul.allow_tf32 = True
 
 # --------------------------------------------------
 # Detect multimodal model
 # --------------------------------------------------
 def is_multimodal_model(model_id: str) -> bool:
-    keywords = [
-        "apriel",
-        "mistral",
-        "ministral",
-        "ministral3",
-        "kimivl",
-        "qwen3-vl",
-        "qwen3.5",
-        "vl"
-    ]
-    return any(k in model_id.lower() for k in keywords)
+    """
+    Detect whether a model should be loaded with
+    AutoModelForImageTextToText.
 
+    This is more reliable than checking model names.
+    """
+
+    config = AutoConfig.from_pretrained(
+        model_id,
+        trust_remote_code=True,
+    )
+
+    architectures = config.architectures or []
+
+    multimodal_keywords = (
+        "ConditionalGeneration",
+        "ImageTextToText",
+        "Vision",
+        "VL",
+    )
+
+    return any(
+        any(keyword in arch for keyword in multimodal_keywords)
+        for arch in architectures
+    )
 
 # --------------------------------------------------
 # Load model + tokenizer
 # --------------------------------------------------
 def load_model(model_id: str):
 
+    print(f"Loading {model_id}")
+
     is_mm_model = is_multimodal_model(model_id)
 
-    print(f"Loading model from {model_id}...")
-
-    if is_mm_model:
-        with load_offloaded_model():
-            model = AutoModelForImageTextToText.from_pretrained(
-                model_id,
-                trust_remote_code=True,
-                dtype="auto",
-                device_map="auto",
-                offload_folder="./offload_model",
-            )
-    else:
-        with load_offloaded_model():
-            model = AutoModelForCausalLM.from_pretrained(
-                model_id,
-                trust_remote_code=True,
-                dtype="auto",
-                device_map="auto",
-                offload_folder="./offload_model",
-            )
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_id,
-        trust_remote_code=True,
+    ModelClass = (
+        AutoModelForImageTextToText
+        if is_mm_model
+        else AutoModelForCausalLM
     )
+
+    with load_offloaded_model():
+
+        model = ModelClass.from_pretrained(
+            model_id,
+            trust_remote_code=True,
+            torch_dtype="auto",
+            device_map="auto",
+            offload_folder="./offload_model",
+        )
+
+    # Prepare tokenizer
+    if is_mm_model:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_id,
+            trust_remote_code=True,
+        )
+        processor = AutoProcessor.from_pretrained(
+            model_id,
+            trust_remote_code=True,
+        )
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_id,
+            trust_remote_code=True,
+        )
+        processor = None
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     model.eval()
     model.config.use_cache = False
-    torch.set_grad_enabled(False)
 
     return model, tokenizer
 
-
 # --------------------------------------------------
-# Compute perplexity
+# Load WikiText-2
 # --------------------------------------------------
 def run_perplexity(model_id: str, block_size: int, max_blocks: int):
 
@@ -84,7 +107,7 @@ def run_perplexity(model_id: str, block_size: int, max_blocks: int):
     print("Loading WikiText-2 dataset...")
 
     dataset = load_dataset(
-        "wikitext",
+        "salesforce/wikitext",
         "wikitext-2-raw-v1",
         split="test",
     )
@@ -156,7 +179,6 @@ def run_perplexity(model_id: str, block_size: int, max_blocks: int):
     ppl = math.exp(total_nll / total_tokens)
 
     print(f"\nWikiText-2 Perplexity: {ppl:.3f}")
-
 
 # --------------------------------------------------
 # CLI

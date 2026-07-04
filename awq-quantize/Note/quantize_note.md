@@ -17,26 +17,26 @@
 ### Model Evaluation Command
 
 ```bash
-python model_eval.py --model_id "xxx" \
+python model_eval.py --model_id "YOUR_HUGGINGFACE_ACCOUNT/MODEL_NAME" \
                      --trust_remote_code True
 ```
 
 ### Model Perplexity Command
 
 ```bash
-python model_perplexity.py --model_id "xxx"
+python model_perplexity.py --model_id "YOUR_HUGGINGFACE_ACCOUNT/MODEL_NAME" --max_blocks 20
 ```
 
 ### Model Quantization Command
 
 ```bash
-python model_quantize.py --model_id "xxx/xxx" \
-                         --dataset_id Salesforce/wikitext,allenai/c4 \
-                         --dataset_config wikitext-2-raw-v1,en \
+python model_quantize.py --model_id "YOUR_HUGGINGFACE_ACCOUNT/MODEL_NAME" \
+                         --dataset_id HuggingFaceH4/ultrachat_200k,Salesforce/wikitext \
+                         --dataset_config ,wikitext-103-raw-v1 \
+                         --dataset_split train_sft,train \
                          --dataset_mix 0.7,0.3 \
-                         --dataset_split train \
-                         --num_samples 256 \
                          --max_seq_length 2048 \
+                         --num_samples 512 \
                          --trust_remote_code True \
                          --trust_remote_code_model True
 ```
@@ -45,7 +45,13 @@ python model_quantize.py --model_id "xxx/xxx" \
 
 ```bash
 python model_upload.py --hf_token xxx \
-                       --repo_id xxx/xxx \
-                       --local_dir xxx \
+                       --repo_id YOUR_HUGGINGFACE_ACCOUNT/MODEL_NAME \
+                       --local_dir MODEL_DIR \
                        --repo_type model
+```
+
+### Model Generate Safetensors Index
+
+```bash
+python model_generate_safetensors.py --model_dir MODEL_DIR
 ```

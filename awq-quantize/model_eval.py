@@ -1,6 +1,7 @@
 # Import required variables and libraries
 import argparse
 import torch
+from pathlib import Path
 from compressed_tensors.offload import load_offloaded_model
 from transformers import (
     AutoModelForCausalLM,
@@ -43,35 +44,39 @@ def model_eval(
     trust_remote_code: bool,
 ): 
     is_mm_model = is_multimodal_model(model_id)
-    
-    if is_mm_model:
-        with load_offloaded_model():
-            model = AutoModelForImageTextToText.from_pretrained(
-                model_id,
-                trust_remote_code=trust_remote_code,
-                dtype="auto",
-                device_map="auto",
-                offload_folder="./offload_model",
-            )
-            processor = AutoProcessor.from_pretrained(
-                model_id,
-                trust_remote_code=trust_remote_code,
-            )
-    else:
-        with load_offloaded_model():
-            model = AutoModelForCausalLM.from_pretrained(
-                model_id,
-                trust_remote_code=trust_remote_code,
-                dtype="auto",
-                device_map="auto",
-                offload_folder="./offload_model",
-            )
+
+    ModelClass = (
+        AutoModelForImageTextToText
+        if is_mm_model
+        else AutoModelForCausalLM
+    )
+
+    with load_offloaded_model():
+
+        model = ModelClass.from_pretrained(
+            model_id,
+            trust_remote_code=True,
+            torch_dtype="auto",
+            device_map="auto",
+            offload_folder="./offload_model",
+        )
 
     # Prepare tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_id,
-        trust_remote_code=trust_remote_code,
-    )
+    if is_mm_model:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_id,
+            trust_remote_code=trust_remote_code,
+        )
+        processor = AutoProcessor.from_pretrained(
+            model_id,
+            trust_remote_code=trust_remote_code,
+        )
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_id,
+            trust_remote_code=trust_remote_code,
+        )
+        processor = None
 
     # Ensure pad token exists (important for batching)
     if tokenizer.pad_token is None:
